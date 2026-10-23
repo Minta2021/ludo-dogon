@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: apk-${{ github.ref }}
@@ -22,10 +23,10 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Récupérer le code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Installer Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -58,7 +59,29 @@ jobs:
         run: flutter test
 
       - name: Construire l'APK
-        run: flutter build apk --release
+        run: |
+          set -o pipefail
+          flutter build apk --release 2>&1 | tee build.log
+
+      - name: Signaler l'erreur de construction dans un ticket
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "La construction n°${GITHUB_RUN_NUMBER} a échoué."
+            echo
+            echo '```'
+            flutter --version 2>&1 | head -n 4
+            echo '```'
+            echo
+            echo "Fin du journal :"
+            echo
+            echo '```'
+            tail -n 180 build.log 2>/dev/null || echo "(pas de journal)"
+            echo '```'
+          } > rapport.md
+          gh issue create --title "Échec de construction n°${GITHUB_RUN_NUMBER}" --body-file rapport.md
 
       - name: Nommer l'APK
         id: apk
