@@ -1,0 +1,86 @@
+# Construit l'APK Android de Ludo Dogon à chaque envoi sur la branche main
+# (ou à la demande depuis l'onglet « Actions »), puis le publie dans une
+# « Release » : il suffit d'ouvrir la page Releases sur le téléphone et de
+# télécharger le fichier .apk.
+name: Construire l'APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Installer Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Version de Flutter
+        run: flutter --version
+
+      - name: Générer les fichiers Android manquants
+        run: |
+          flutter create --platforms=android --org com.bminformatix --project-name ludo_dogon .
+          # Mémoire adaptée aux machines de GitHub.
+          sed -i 's/-Xmx[0-9]*[GgMm]/-Xmx4G/' android/gradle.properties || true
+          cat android/gradle.properties
+
+      - name: Dépendances
+        run: flutter pub get
+
+      - name: Analyse du code
+        continue-on-error: true
+        run: flutter analyze --no-fatal-infos
+
+      - name: Tests
+        continue-on-error: true
+        run: flutter test
+
+      - name: Construire l'APK
+        run: flutter build apk --release
+
+      - name: Nommer l'APK
+        id: apk
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          NAME="LudoDogon-v${VERSION}-${GITHUB_RUN_NUMBER}.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "$NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          ls -lh "$NAME"
+
+      - name: Garder l'APK dans les artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: ${{ steps.apk.outputs.name }}
+
+      - name: Publier la Release (téléchargement depuis le téléphone)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.apk.outputs.tag }}" "${{ steps.apk.outputs.name }}" \
+            --title "Ludo Dogon ${{ steps.apk.outputs.tag }}" \
+            --notes "APK Android de Ludo Dogon. Sur le téléphone : télécharger le fichier .apk ci-dessous, l'ouvrir et autoriser l'installation. Pour une nouvelle version, désinstaller d'abord l'ancienne." \
+            --latest

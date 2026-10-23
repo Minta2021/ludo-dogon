@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Écran de lancement : fond nuit de latérite, comme le jeu. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <color android:color="#FF22160F" />
+    </item>
+</layer-list>

@@ -1,0 +1,27 @@
+# Fichiers générés par Flutter et les outils
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+.metadata
+*.iml
+.idea/
+.vscode/
+.DS_Store
+
+# Android : fichiers locaux et générés
+android/.gradle/
+android/local.properties
+android/gradlew
+android/gradlew.bat
+android/gradle/wrapper/gradle-wrapper.jar
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/**/GeneratedPluginRegistrant.java
+android/key.properties
+*.jks
+*.keystore

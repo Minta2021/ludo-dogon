@@ -1,0 +1,37 @@
+name: ludo_dogon
+description: "Ludo Dogon — le jeu des masques de la falaise. Ludo aux motifs dogon, jouable seul contre l'ordinateur, à plusieurs sur un téléphone ou en Bluetooth."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  nearby_connections: ^4.3.0
+  permission_handler: ^13.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: Unbounded
+      fonts:
+        - asset: assets/fonts/Unbounded-Bold.ttf
+          weight: 700
+    - family: NunitoSans
+      fonts:
+        - asset: assets/fonts/NunitoSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/NunitoSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/NunitoSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/NunitoSans-ExtraBold.ttf
+          weight: 800
