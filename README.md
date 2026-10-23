@@ -10,12 +10,19 @@ Projet Flutter réalisé pour BM-INFORMATIX (Bandiagara, Mali).
 
 ## Télécharger l'APK
 
-À chaque envoi sur la branche `main`, GitHub construit automatiquement l'APK
-(onglet **Actions**, environ 10 minutes) puis le publie dans **Releases**.
-Sur le téléphone : ouvrir la page *Releases* du dépôt, toucher le fichier
-`LudoDogon-….apk`, l'ouvrir et autoriser l'installation d'applications
-inconnues. Pour installer une nouvelle version, désinstaller d'abord
-l'ancienne (chaque construction est signée avec une clé de test différente).
+👉 **https://github.com/Minta2021/ludo-dogon/releases/latest**
+
+À chaque envoi sur la branche `main`, GitHub construit automatiquement le jeu
+(onglet **Actions**, une dizaine de minutes) puis publie trois APK dans
+**Releases**. Sur le téléphone, télécharger **un seul** fichier :
+
+- `…-arm64-recent.apk` (le plus léger) : la plupart des téléphones récents ;
+- `…-armv7-ancien.apk` : téléphones anciens ou d'entrée de gamme ;
+- `….apk` sans suffixe (plus lourd) : fonctionne sur tous les téléphones.
+
+Ouvrir le fichier et autoriser l'installation d'applications inconnues. Pour
+installer une nouvelle version, désinstaller d'abord l'ancienne (chaque
+construction est signée avec une clé de test différente).
 
 ---
 

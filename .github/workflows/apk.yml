@@ -51,12 +51,18 @@ jobs:
         run: flutter pub get
 
       - name: Analyse du code
+        id: analyse
         continue-on-error: true
-        run: flutter analyze --no-fatal-infos
+        run: |
+          set -o pipefail
+          flutter analyze --no-fatal-infos 2>&1 | tee analyse.log
 
       - name: Tests
+        id: tests
         continue-on-error: true
-        run: flutter test
+        run: |
+          set -o pipefail
+          flutter test 2>&1 | tee tests.log
 
       - name: Construire l'APK
         run: |
@@ -83,27 +89,63 @@ jobs:
           } > rapport.md
           gh issue create --title "Échec de construction n°${GITHUB_RUN_NUMBER}" --body-file rapport.md
 
-      - name: Nommer l'APK
+      - name: Nommer l'APK universel
         id: apk
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
           NAME="LudoDogon-v${VERSION}-${GITHUB_RUN_NUMBER}.apk"
           cp build/app/outputs/flutter-apk/app-release.apk "$NAME"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "base=LudoDogon-v${VERSION}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
           echo "tag=v${VERSION}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
           ls -lh "$NAME"
 
-      - name: Garder l'APK dans les artefacts
-        uses: actions/upload-artifact@v4
+      - name: Construire les APK légers (un par processeur)
+        run: |
+          flutter build apk --release --split-per-abi
+          B="${{ steps.apk.outputs.base }}"
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "$B-arm64-recent.apk"
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk "$B-armv7-ancien.apk"
+          ls -lh LudoDogon-*.apk
+
+      - name: Garder les APK dans les artefacts
+        uses: actions/upload-artifact@v5
         with:
-          name: ${{ steps.apk.outputs.name }}
-          path: ${{ steps.apk.outputs.name }}
+          name: ${{ steps.apk.outputs.base }}
+          path: LudoDogon-*.apk
 
       - name: Publier la Release (téléchargement depuis le téléphone)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ steps.apk.outputs.tag }}" "${{ steps.apk.outputs.name }}" \
+          cat > notes.md <<'NOTES'
+          APK Android de Ludo Dogon. Sur le téléphone : télécharger **un seul** fichier ci-dessous, l'ouvrir et autoriser l'installation.
+
+          - `…-arm64-recent.apk` (le plus léger) : la plupart des téléphones achetés depuis 2018.
+          - `…-armv7-ancien.apk` : téléphones anciens ou d'entrée de gamme.
+          - `….apk` sans suffixe (plus lourd) : fonctionne partout, en cas de doute.
+
+          Pour installer une nouvelle version, désinstaller d'abord l'ancienne.
+          NOTES
+          gh release create "${{ steps.apk.outputs.tag }}" LudoDogon-*.apk \
             --title "Ludo Dogon ${{ steps.apk.outputs.tag }}" \
-            --notes "APK Android de Ludo Dogon. Sur le téléphone : télécharger le fichier .apk ci-dessous, l'ouvrir et autoriser l'installation. Pour une nouvelle version, désinstaller d'abord l'ancienne." \
+            --notes-file notes.md \
             --latest
+
+      - name: Signaler un problème d'analyse ou de tests
+        if: steps.analyse.outcome == 'failure' || steps.tests.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "Construction n°${GITHUB_RUN_NUMBER} : l'APK est publié, mais l'analyse ou les tests signalent un problème."
+            echo
+            echo "Analyse : ${{ steps.analyse.outcome }} — Tests : ${{ steps.tests.outcome }}"
+            echo
+            echo '```'
+            tail -n 60 analyse.log 2>/dev/null
+            echo '---'
+            tail -n 80 tests.log 2>/dev/null
+            echo '```'
+          } > qualite.md
+          gh issue create --title "Analyse ou tests n°${GITHUB_RUN_NUMBER}" --body-file qualite.md
