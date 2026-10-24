@@ -10,6 +10,7 @@ import '../game/board.dart';
 import '../models/match.dart';
 import 'links.dart';
 import 'nearby_service.dart';
+import 'net_log.dart';
 
 /// Un téléphone qui demande à entrer dans la partie.
 class JoinRequest {
@@ -24,7 +25,16 @@ class JoinRequest {
 }
 
 class HostSession extends ChangeNotifier implements HostLink {
-  HostSession({required this.net, required this.hostName, required this.hostSeat});
+  HostSession({
+    required this.net,
+    required this.hostName,
+    required this.hostSeat,
+    this.autoAccept = true,
+  });
+
+  /// Accepter automatiquement les téléphones qui demandent à entrer (l'hôte
+  /// peut ensuite retirer un joueur depuis le salon).
+  final bool autoAccept;
 
   final NetService net;
   final String hostName;
@@ -191,11 +201,13 @@ class HostSession extends ChangeNotifier implements HostLink {
     switch (e) {
       case ConnectionRequested(:final id, :final name, :final token):
         if (_started || isFull) {
+          netLog('« $name » refusé : ${_started ? 'partie déjà lancée' : 'partie complète'}.');
           unawaited(net.reject(id));
           return;
         }
         _requests[id] = JoinRequest(id: id, name: name, token: token);
         _notify();
+        if (autoAccept) unawaited(acceptRequest(id));
       case PeerConnected():
         // On attend son message « hello » pour l'installer.
         break;
@@ -284,12 +296,14 @@ class HostSession extends ChangeNotifier implements HostLink {
     }
     _seats[seat] = PlayerSlot(seat: seat, name: name, kind: PlayerKind.remote, endpointId: id);
     _seatOf[id] = seat;
+    netLog('« $name » entre dans la partie (masque n°${seat + 1}).');
     net.send(id, {'t': 'welcome', 'seat': seat, 'players': _lobbyJson()});
     _broadcastLobby();
     _notify();
   }
 
   void _deny(String id, String reason) {
+    netLog('Refus envoyé : $reason');
     net.send(id, {'t': 'deny', 'reason': reason});
     Future<void>.delayed(const Duration(milliseconds: 400), () => net.disconnect(id));
     _notify();

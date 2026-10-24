@@ -1,0 +1,19 @@
+name: nearby_connections
+description: Copie locale du plugin nearby_connections 4.3.0 (Android Nearby Connections), adaptée pour Ludo Dogon.
+version: 4.3.0+ludo
+publish_to: 'none'
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.pkmnapps.nearby_connections
+        pluginClass: NearbyConnectionsPlugin

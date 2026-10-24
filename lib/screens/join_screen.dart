@@ -12,6 +12,7 @@ import '../net/nearby_service.dart';
 import '../ui/dogon_icons.dart';
 import '../ui/theme.dart';
 import '../ui/widgets/common.dart';
+import 'diagnostic_screen.dart';
 import 'game_screen.dart';
 
 class JoinScreen extends StatefulWidget {
@@ -101,6 +102,15 @@ class _JoinScreenState extends State<JoinScreen> {
     }
   }
 
+  Future<void> _openDiagnostic() async {
+    await _session.close();
+    if (!mounted) return;
+    _handedOff = true;
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const DiagnosticScreen()),
+    );
+  }
+
   Widget _searching() {
     final games = _session.games;
     return ListView(
@@ -132,9 +142,16 @@ class _JoinScreenState extends State<JoinScreen> {
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Text(
               'Aucune partie pour l\'instant. Demande à l\'hôte de toucher '
-              '« Créer une partie » et garde les téléphones proches.',
+              '« Créer une partie » et garde les téléphones proches. La recherche '
+              'peut prendre jusqu\'à 30 secondes.',
               style: AppText.small,
             ),
+          ),
+        if (games.isEmpty)
+          TextButton(
+            onPressed: _openDiagnostic,
+            child: const Text('Rien ne s\'affiche ? Voir le diagnostic Bluetooth',
+                style: TextStyle(color: DogonColors.ochre, fontWeight: FontWeight.w700)),
           ),
         for (final g in games) ...[
           _GameTile(game: g, onJoin: () => _session.join(g)),
@@ -166,8 +183,8 @@ class _JoinScreenState extends State<JoinScreen> {
               const SizedBox(height: 8),
               Text(
                 token == null
-                    ? 'Patiente quelques secondes.'
-                    : 'L\'hôte doit accepter. Vérifie qu\'il voit le code :',
+                    ? 'Patiente quelques secondes, garde les téléphones proches.'
+                    : 'Presque fini… Code de connexion :',
                 textAlign: TextAlign.center,
                 style: AppText.small.copyWith(fontSize: 13),
               ),
@@ -290,6 +307,12 @@ class _JoinScreenState extends State<JoinScreen> {
           label: 'Chercher à nouveau',
           icon: DogonIcon.refresh,
           onPressed: _session.backToSearch,
+        ),
+        const SizedBox(height: 10),
+        SecondaryButton(
+          label: 'Voir le diagnostic Bluetooth',
+          icon: DogonIcon.bluetooth,
+          onPressed: _openDiagnostic,
         ),
       ],
     );

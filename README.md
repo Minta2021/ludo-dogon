@@ -74,15 +74,15 @@ flutter build apk --release --split-per-abi
 
 ## 4. Jouer en Bluetooth
 
-1. Sur chaque téléphone : active le **Bluetooth**. Sur Android 12 ou plus
-   ancien, active aussi la **localisation** (GPS) : Android l'exige pour
-   trouver les téléphones proches. Le jeu n'enregistre pas la position.
-2. L'hôte touche **Jouer en Bluetooth › Créer une partie**.
-3. Les autres touchent **Jouer en Bluetooth › Rejoindre une partie** puis
-   choisissent la partie de l'hôte dans la liste.
-4. L'hôte voit « … veut rejoindre » avec un **code** : il vérifie que le
-   même code s'affiche chez le joueur, puis touche **Accepter**.
-5. L'hôte peut remplir les places libres avec l'ordinateur, puis touche
+1. Sur chaque téléphone : active le **Bluetooth** et la **localisation (GPS)**.
+   L'écran *Jouer en Bluetooth* affiche une carte « Avant de jouer » qui
+   vérifie tout et propose un bouton pour régler chaque point. Le jeu
+   n'enregistre pas la position.
+2. L'hôte touche **Créer une partie** et garde l'écran du salon ouvert.
+3. Les autres touchent **Rejoindre une partie**, puis la partie de l'hôte dans
+   la liste : ils entrent **automatiquement** dans le salon (l'hôte peut retirer
+   quelqu'un avec ✕).
+4. L'hôte peut remplir les places libres avec l'ordinateur, puis touche
    **Lancer la partie**.
 
 Le téléphone de l'hôte arbitre la partie : il lance les dés et applique les
@@ -91,8 +91,18 @@ déconnecte, l'ordinateur prend sa place et la partie continue. Si un joueur
 connecté ne joue pas pendant 30 secondes, l'ordinateur joue à sa place.
 
 Le Bluetooth utilise l'API *Nearby Connections* de Google : les services
-Google Play doivent être présents sur les téléphones (c'est le cas de la
-plupart des téléphones Android : Tecno, Infinix, Itel, Samsung…).
+Google Play doivent être présents sur les téléphones.
+
+### Diagnostic Bluetooth
+
+*Jouer en Bluetooth › Diagnostic Bluetooth* montre l'état du téléphone
+(Android, services Google Play, Bluetooth, localisation, autorisations) et
+permet un **test entre deux téléphones** : l'un touche « Être visible »,
+l'autre « Chercher » puis le nom trouvé. S'ils se connectent et que le nombre
+de messages augmente des deux côtés, le Bluetooth fonctionne.
+
+Le **journal** en bas de l'écran note chaque étape avec les codes d'erreur
+Nearby (par exemple `8034`). Le bouton **Copier** permet de l'envoyer.
 
 ## 5. Règles appliquées
 
@@ -124,7 +134,9 @@ lib/
     game_controller.dart       déroulement d'une partie, animations, arbitrage
     game_events.dart           événements échangés entre téléphones
   net/
-    nearby_service.dart        couche Bluetooth (nearby_connections)
+    nearby_service.dart        couche Bluetooth (nearby_connections), messages d'erreur
+    net_log.dart               journal des étapes Bluetooth (diagnostic)
+    readiness.dart             état du téléphone (Bluetooth, GPS, autorisations)
     host_session.dart          salon et arbitrage côté hôte
     client_session.dart        recherche, connexion et partie côté invité
     permissions.dart           autorisations selon la version d'Android
@@ -132,7 +144,8 @@ lib/
   models/                      configuration de partie, profil du joueur
   ui/                          couleurs, icônes dogon, plateau, pions, dé
   screens/                     accueil, préparation, Bluetooth, jeu, règles
-android/app/src/main/          manifeste (autorisations), icône, MainActivity
+android/app/src/main/          manifeste (autorisations), icône, MainActivity, sons
+packages/nearby_connections/   copie locale corrigée du plugin Bluetooth
 assets/fonts/                  polices Unbounded et Nunito Sans (licence OFL)
 test/                          tests des règles et de l'accueil
 ```
@@ -180,8 +193,9 @@ affichage et connexion Bluetooth réelle).
 
 | Problème | Solution |
 | --- | --- |
-| « Autorisation manquante » au moment du Bluetooth | Réglages › Applications › Ludo Dogon › Autorisations : autoriser « Appareils à proximité » (et « Localisation » sur Android 12 ou moins). |
-| Les téléphones ne se trouvent pas | Bluetooth activé partout, localisation activée (Android 12 ou moins), mode avion coupé, téléphones à moins de quelques mètres. Réessayer « Rejoindre ». |
+| « Autorisation manquante » au moment du Bluetooth | Réglages › Applications › Ludo Dogon › Autorisations : autoriser « Appareils à proximité » et « Localisation » (« Position exacte » si Android le propose). |
+| Les téléphones ne se trouvent pas | Bluetooth **et** localisation activés sur chaque téléphone, mode avion coupé, téléphones à moins de quelques mètres. Faire le test du *Diagnostic Bluetooth* et regarder le journal. |
+| « Services Google Play absents » | Le Bluetooth du jeu a besoin des services Google Play (Play Store). Mettre à jour les services Google Play. |
 | « Vos versions de Ludo Dogon sont différentes » | Installer le même APK sur tous les téléphones. |
 | La compilation Android échoue à cause d'un plugin | Lancer `flutter clean`, puis `flutter pub upgrade`, puis recompiler. Vérifier aussi que `android/gradle.properties` contient bien `android.newDsl=false` (ajouté par Flutter). |
 | `flutter create` refuse le nom du projet | Utiliser exactement la commande de la section 2 (avec `--project-name ludo_dogon`). |

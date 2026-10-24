@@ -9,6 +9,7 @@ import '../game/rules.dart';
 import '../models/match.dart';
 import 'links.dart';
 import 'nearby_service.dart';
+import 'net_log.dart';
 
 enum ClientStatus {
   idle,
@@ -72,6 +73,16 @@ class ClientSession extends ChangeNotifier implements ClientLink {
     }
   }
 
+  /// Nombre d'essais pour la demande de connexion (les radios Bluetooth
+  /// échouent souvent au premier essai).
+  static const int maxAttempts = 3;
+
+  /// Délai maximum entre la demande et l'entrée dans le salon.
+  static const Duration connectTimeout = Duration(seconds: 35);
+
+  Timer? _connectTimer;
+  int _attempt = 0;
+
   Future<void> join(FoundGame game) async {
     if (status == ClientStatus.connecting || status == ClientStatus.inLobby) return;
     status = ClientStatus.connecting;
@@ -79,11 +90,37 @@ class ClientSession extends ChangeNotifier implements ClientLink {
     _hostId = game.id;
     error = null;
     token = null;
+    _attempt = 0;
     _notify();
-    try {
-      await net.requestConnection(myName, game.id);
-    } on NetException catch (e) {
-      _fail(e.message);
+    _connectTimer?.cancel();
+    _connectTimer = Timer(connectTimeout, () {
+      if (status != ClientStatus.connecting) return;
+      netLog('Délai dépassé : pas de réponse de « ${game.hostName} ».');
+      final id = _hostId;
+      if (id != null) unawaited(net.disconnect(id));
+      _hostId = null;
+      _fail('La connexion n\'aboutit pas. Rapproche les téléphones, vérifie que le '
+          'Bluetooth et la localisation sont activés des deux côtés, puis réessaie.');
+    });
+    await _request(game);
+  }
+
+  Future<void> _request(FoundGame game) async {
+    while (status == ClientStatus.connecting && _hostId == game.id) {
+      _attempt++;
+      try {
+        await net.requestConnection(myName, game.id);
+        return;
+      } on NetException catch (e) {
+        if (status != ClientStatus.connecting || _hostId != game.id) return;
+        if (!e.retryable || _attempt >= maxAttempts) {
+          _connectTimer?.cancel();
+          _fail(e.message);
+          return;
+        }
+        netLog('Nouvel essai de connexion (${_attempt + 1}/$maxAttempts)…');
+        await Future<void>.delayed(Duration(milliseconds: 1200 * _attempt));
+      }
     }
   }
 
@@ -98,6 +135,7 @@ class ClientSession extends ChangeNotifier implements ClientLink {
   }
 
   void _fail(String message) {
+    _connectTimer?.cancel();
     error = message;
     status = ClientStatus.failed;
     _notify();
@@ -106,6 +144,7 @@ class ClientSession extends ChangeNotifier implements ClientLink {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
+    _connectTimer?.cancel();
     await _sub?.cancel();
     await net.shutdown();
     await _game.close();
@@ -143,7 +182,7 @@ class ClientSession extends ChangeNotifier implements ClientLink {
         }
         token = code;
         _notify();
-        // L'invité accepte de son côté ; l'hôte doit aussi accepter.
+        // L'invité accepte de son côté ; l'hôte accepte du sien.
         unawaited(net.accept(id).catchError((Object err) {
           _fail('$err');
         }));
@@ -156,12 +195,22 @@ class ClientSession extends ChangeNotifier implements ClientLink {
           'seat': preferredSeat,
           'v': protocolVersion,
         });
-      case ConnectionFailed(:final id, :final rejected):
+      case ConnectionFailed(:final id, :final rejected, :final code):
         if (id != _hostId) return;
+        if (!rejected && status == ClientStatus.connecting && _attempt < maxAttempts) {
+          // Échec radio pendant la poignée de main : on retente.
+          final game = FoundGame(id: id, hostName: hostName ?? '');
+          netLog('Connexion interrompue${code != null ? ' (code $code)' : ''}, nouvel essai…');
+          Future<void>.delayed(Duration(milliseconds: 1500 * _attempt), () {
+            if (status == ClientStatus.connecting && _hostId == id) _request(game);
+          });
+          return;
+        }
         _hostId = null;
         _fail(rejected
             ? 'L\'hôte a refusé ta demande.'
-            : 'La connexion a échoué. Rapproche les téléphones et réessaie.');
+            : 'La connexion a échoué${code != null ? ' (code $code)' : ''}. '
+                'Rapproche les téléphones et réessaie.');
       case PeerDisconnected(:final id):
         if (id != _hostId) return;
         if (status == ClientStatus.started) {
@@ -178,7 +227,9 @@ class ClientSession extends ChangeNotifier implements ClientLink {
   void _onMessage(Map<String, Object?> data) {
     switch (data['t']) {
       case 'welcome':
+        _connectTimer?.cancel();
         mySeat = (data['seat'] as num?)?.toInt();
+        netLog('Entré dans la partie de « ${hostName ?? '?'} ».');
         lobby = _players(data['players']);
         status = ClientStatus.inLobby;
         _notify();

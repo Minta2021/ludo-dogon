@@ -1,0 +1,3 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Les autorisations sont déclarées dans le manifeste de l'application. -->
+</manifest>

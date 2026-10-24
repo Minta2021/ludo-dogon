@@ -12,6 +12,7 @@ import '../net/nearby_service.dart';
 import '../ui/dogon_icons.dart';
 import '../ui/theme.dart';
 import '../ui/widgets/common.dart';
+import 'diagnostic_screen.dart';
 import 'game_screen.dart';
 
 class HostLobbyScreen extends StatefulWidget {
@@ -52,6 +53,25 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
       if (!ok || !mounted) return;
     }
     Navigator.of(context).pop();
+  }
+
+  /// Le diagnostic utilise le Bluetooth : on ferme d'abord la partie.
+  Future<void> _openDiagnostic() async {
+    if (_session.remoteCount > 0) {
+      final ok = await confirmDialog(
+        context,
+        title: 'Fermer la partie ?',
+        message: 'Le diagnostic ferme la partie et déconnecte les joueurs.',
+        confirm: 'Continuer',
+      );
+      if (!ok || !mounted) return;
+    }
+    _handedOff = true;
+    await _session.close();
+    if (!mounted) return;
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const DiagnosticScreen()),
+    );
   }
 
   void _start() {
@@ -96,6 +116,7 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                     children: [
                       _statusCard(),
+                      if (!_session.autoAccept)
                       for (final r in _session.requests) ...[
                         const SizedBox(height: 12),
                         _RequestCard(
@@ -123,6 +144,12 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
                         ),
                       const SizedBox(height: 10),
                       const _LocationTip(),
+                      const SizedBox(height: 4),
+                      TextButton(
+                        onPressed: _openDiagnostic,
+                        child: const Text('Personne ne trouve ta partie ? Voir le diagnostic',
+                            style: TextStyle(color: DogonColors.ochre, fontWeight: FontWeight.w700)),
+                      ),
                     ],
                   ),
                 ),
@@ -363,8 +390,8 @@ class _LocationTip extends StatelessWidget {
         border: Border.all(color: DogonColors.outline),
       ),
       child: const Text(
-        'Vérifiez que le code affiché est le même sur les deux téléphones '
-        'avant d\'accepter.',
+        'Les joueurs qui rejoignent entrent automatiquement dans la partie. '
+        'Touche ✕ pour retirer quelqu\'un. Garde cet écran ouvert.',
         style: TextStyle(fontSize: 13, color: DogonColors.muted, fontWeight: FontWeight.w600),
       ),
     );

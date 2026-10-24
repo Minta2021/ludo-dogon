@@ -1,0 +1,50 @@
+// Copie locale du plugin nearby_connections 4.3.0 (licence BSD-2), adaptée
+// pour Ludo Dogon : bibliothèque Nearby récente, codes d'erreur transmis au
+// jeu, statuts inconnus gérés, contexte d'application en secours.
+group 'com.pkmnapps.nearby_connections'
+version '1.0-SNAPSHOT'
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.4.2'
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    if (project.android.hasProperty("namespace")) {
+        namespace 'com.pkmnapps.nearby_connections'
+    }
+
+    compileSdk 36
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    defaultConfig {
+        minSdkVersion 24
+    }
+
+    lint {
+        disable 'InvalidPackage'
+    }
+
+    dependencies {
+        api 'com.google.android.gms:play-services-nearby:19.5.1'
+    }
+}

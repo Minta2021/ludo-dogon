@@ -1,5 +1,11 @@
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    - packages/**
+    - tool/**
+    - build/**
+
 linter:
   rules:
     prefer_single_quotes: true
