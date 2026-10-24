@@ -10,6 +10,7 @@ import '../../game/board.dart';
 import '../board_geometry.dart';
 import '../board_painter.dart';
 import '../theme.dart';
+import 'capture_flash.dart';
 import 'pawn_view.dart';
 
 class BoardView extends StatefulWidget {
@@ -111,6 +112,13 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
           ),
         ),
         for (final e in entries) _positionedPawn(e, cell),
+        Positioned.fill(
+          child: CaptureFlash(
+            trigger: c.captureFlash,
+            seat: c.captureSeat,
+            duration: GameTiming.captureFlash,
+          ),
+        ),
       ],
     );
   }

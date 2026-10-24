@@ -26,26 +26,23 @@ class RulesScreen extends StatelessWidget {
     (
       DogonIcon.refresh,
       'Le six',
-      'Un 6 donne un nouveau lancer. Mais trois 6 de suite font perdre le tour !',
+      'Le 6 sort plus souvent qu\'avec un dé ordinaire : une chance sur quatre. '
+          'Chaque 6 donne un nouveau lancer, jusqu\'à cinq 6 de suite. '
+          'Au sixième 6 d\'affilée, le tour est perdu !',
     ),
     (
       DogonIcon.walu,
-      'Capturer',
-      'Si ton pion tombe pile sur un pion adverse, celui-ci retourne dans sa '
-          'base et tu rejoues.',
-    ),
-    (
-      DogonIcon.granary,
-      'Les greniers',
-      'Les cases de départ et les greniers sont des abris : aucun pion ne '
-          'peut y être capturé.',
+      'Avaler',
+      'Si ton pion tombe pile sur un pion adverse, il l\'avale : le pion adverse '
+          'retourne dans sa base et tu rejoues. On peut avaler partout sur le '
+          'parcours, même sur les cases de départ : il n\'y a aucun abri !',
     ),
     (
       DogonIcon.toguna,
       'La toguna',
-      'Après un tour complet, ton pion entre dans le couloir à ta couleur. '
-          'Il faut le nombre exact pour atteindre la toguna. Y rentrer un pion '
-          'donne un nouveau lancer.',
+      'Après un tour complet, ton pion entre dans le couloir à ta couleur, où '
+          'personne ne peut l\'avaler. Il faut le nombre exact pour atteindre la '
+          'toguna. Y rentrer un pion donne un nouveau lancer.',
     ),
     (
       DogonIcon.bluetooth,

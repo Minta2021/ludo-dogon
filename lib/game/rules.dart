@@ -1,13 +1,16 @@
 /// État d'une partie et règles du jeu (code Dart pur, sans Flutter).
 ///
-/// Règles appliquées (Ludo classique) :
+/// Règles de Ludo Dogon :
 /// * chaque joueur a 4 pions qui partent de sa base ;
 /// * il faut un 6 pour sortir un pion sur sa case de départ ;
-/// * un 6 donne un nouveau lancer ; trois 6 de suite font perdre le tour ;
-/// * tomber sur un pion adverse hors case protégée le renvoie à sa base
-///   et donne un nouveau lancer ;
-/// * les cases de départ et les greniers sont protégés ;
-/// * après un tour complet, le pion entre dans son couloir d'arrivée ;
+/// * le 6 sort plus souvent qu'avec un dé ordinaire (voir dice.dart) ;
+/// * un 6 donne un nouveau lancer, jusqu'à [Rules.maxSixesInARow] fois de
+///   suite ; le 6 suivant fait perdre le tour ;
+/// * tomber sur un pion adverse l'avale : il retourne à sa base et le joueur
+///   rejoue. On peut avaler n'importe où sur le parcours, cases de départ
+///   comprises (il n'y a aucun abri) ;
+/// * après un tour complet, le pion entre dans son couloir d'arrivée, où
+///   personne d'autre ne peut aller ;
 /// * il faut le nombre exact pour atteindre la toguna, ce qui donne un
 ///   nouveau lancer ;
 /// * le premier joueur qui ramène ses 4 pions gagne ; la partie continue
@@ -39,8 +42,8 @@ enum RollEnd {
   /// Aucun pion ne peut bouger, mais c'est un 6 : le joueur relance.
   noMoveRollAgain,
 
-  /// Troisième 6 d'affilée : le tour passe au joueur suivant.
-  threeSixes,
+  /// Trop de 6 d'affilée : le tour passe au joueur suivant.
+  tooManySixes,
 }
 
 /// Photo complète d'une partie à un instant donné.
@@ -236,6 +239,10 @@ class MoveResult {
 /// Les règles du jeu. Toutes les fonctions sont pures : elles ne modifient
 /// jamais l'état reçu et renvoient un nouvel état.
 abstract final class Rules {
+  /// Nombre de 6 consécutifs que l'on peut jouer. Le 6 suivant fait perdre
+  /// le tour.
+  static const int maxSixesInARow = 5;
+
   /// Pions que [seat] peut déplacer avec [value].
   static List<int> legalPawns(GameState state, int seat, int value) {
     final result = <int>[];
@@ -268,13 +275,13 @@ abstract final class Rules {
     final sixes = value == 6 ? state.sixes + 1 : 0;
     final rolled = state.copyWith(dice: value, sixes: sixes, turn: state.turn + 1);
 
-    if (sixes >= 3) {
+    if (sixes > maxSixesInARow) {
       return RollResult(
         state: rolled.copyWith(
             current: nextSeat(rolled, state.current), phase: Phase.rolling, sixes: 0),
         value: value,
         legal: const [],
-        end: RollEnd.threeSixes,
+        end: RollEnd.tooManySixes,
       );
     }
 
@@ -321,21 +328,19 @@ abstract final class Rules {
     final steps = [for (final row in state.steps) [...row]];
     steps[seat][pawn] = to;
 
-    // Captures sur le parcours commun, hors cases protégées.
+    // Pions adverses avalés : partout sur le parcours commun, sans abri.
     final captures = <Capture>[];
     if (to <= Board.lastTrackStep) {
       final target = Board.absoluteIndex(seat, to);
-      if (!Board.isSafeIndex(target)) {
-        for (final other in state.seats) {
-          if (other == seat) continue;
-          for (var q = 0; q < Board.pawnsPerPlayer; q++) {
-            final s = steps[other][q];
-            if (s >= 0 &&
-                s <= Board.lastTrackStep &&
-                Board.absoluteIndex(other, s) == target) {
-              captures.add(Capture(seat: other, pawn: q, from: s));
-              steps[other][q] = Board.inBase;
-            }
+      for (final other in state.seats) {
+        if (other == seat) continue;
+        for (var q = 0; q < Board.pawnsPerPlayer; q++) {
+          final s = steps[other][q];
+          if (s >= 0 &&
+              s <= Board.lastTrackStep &&
+              Board.absoluteIndex(other, s) == target) {
+            captures.add(Capture(seat: other, pawn: q, from: s));
+            steps[other][q] = Board.inBase;
           }
         }
       }

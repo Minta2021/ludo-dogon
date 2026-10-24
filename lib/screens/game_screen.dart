@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../controllers/game_controller.dart';
 import '../game/board.dart';
 import '../models/match.dart';
+import '../services/sound.dart';
 import '../ui/board_geometry.dart';
 import '../ui/dogon_icons.dart';
 import '../ui/theme.dart';
@@ -110,6 +111,18 @@ class _GameScreenState extends State<GameScreen> {
                 label: 'Reprendre',
                 icon: DogonIcon.check,
                 onPressed: () => Navigator.of(context).pop('resume'),
+              ),
+              const SizedBox(height: 10),
+              ListenableBuilder(
+                listenable: SoundFx.instance,
+                builder: (context, _) {
+                  final on = SoundFx.instance.enabled;
+                  return SecondaryButton(
+                    label: on ? 'Son : activé' : 'Son : coupé',
+                    icon: on ? DogonIcon.sound : DogonIcon.soundOff,
+                    onPressed: () => SoundFx.instance.setEnabled(!on),
+                  );
+                },
               ),
               const SizedBox(height: 10),
               SecondaryButton(

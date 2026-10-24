@@ -94,14 +94,8 @@ abstract final class Board {
     return (startIndex(seat) + step) % trackLength;
   }
 
-  /// Case de départ (protégée) : une par siège.
+  /// Case de départ d'un des sièges (une par siège).
   static bool isStartIndex(int index) => index % 13 == 0;
-
-  /// Grenier (case protégée) : huit cases après chaque départ.
-  static bool isGranaryIndex(int index) => index % 13 == 8;
-
-  /// Les pions ne peuvent pas être capturés sur les cases protégées.
-  static bool isSafeIndex(int index) => isStartIndex(index) || isGranaryIndex(index);
 
   /// Siège dont [index] est la case de départ, sinon null.
   static int? startSeatOf(int index) => isStartIndex(index) ? index ~/ 13 : null;
@@ -112,13 +106,5 @@ abstract final class Board {
     if (step < 0 || step >= homeStep) return null;
     if (step <= lastTrackStep) return track[absoluteIndex(seat, step)];
     return lanes[seat][step - lastTrackStep - 1];
-  }
-
-  /// Vrai si l'étape correspond à une case où le pion ne peut pas être pris :
-  /// case protégée du parcours, couloir d'arrivée ou toguna.
-  static bool isSafeStep(int seat, int step) {
-    if (step < 0) return true;
-    if (step > lastTrackStep) return true;
-    return isSafeIndex(absoluteIndex(seat, step));
   }
 }

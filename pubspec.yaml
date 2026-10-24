@@ -1,7 +1,7 @@
 name: ludo_dogon
 description: "Ludo Dogon — le jeu des masques de la falaise. Ludo aux motifs dogon, jouable seul contre l'ordinateur, à plusieurs sur un téléphone ou en Bluetooth."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: ^3.6.0

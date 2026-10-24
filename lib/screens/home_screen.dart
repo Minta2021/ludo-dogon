@@ -67,6 +67,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
+                        const SoundToggleButton(),
+                        const SizedBox(width: 10),
                         SquareIconButton(
                           icon: DogonIcon.book,
                           label: 'Règles du jeu',

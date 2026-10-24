@@ -10,10 +10,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../game/ai.dart';
-import '../game/board.dart';
+import '../game/dice.dart';
 import '../game/rules.dart';
 import '../models/match.dart';
 import '../net/links.dart';
+import '../services/sound.dart';
 import 'game_events.dart';
 
 /// Ton du message affiché sous le plateau.
@@ -25,7 +26,8 @@ abstract final class GameTiming {
   static const hop = Duration(milliseconds: 150);
   static const exitBase = Duration(milliseconds: 300);
   static const afterMove = Duration(milliseconds: 220);
-  static const afterCapture = Duration(milliseconds: 520);
+  static const afterCapture = Duration(milliseconds: 1450);
+  static const captureFlash = Duration(milliseconds: 1350);
   static const noMovePause = Duration(milliseconds: 1000);
   static const botRoll = Duration(milliseconds: 700);
   static const botMove = Duration(milliseconds: 500);
@@ -41,8 +43,10 @@ class GameController extends ChangeNotifier {
     this.clientLink,
     GameState? initialState,
     math.Random? random,
+    void Function(GameSound sound)? playSound,
   })  : _config = config,
         _rng = random ?? math.Random(),
+        _playSound = playSound ?? SoundFx.instance.play,
         _state = initialState ?? _freshState(config, random ?? math.Random()) {
     _auth = _state;
     final host = hostLink;
@@ -67,6 +71,7 @@ class GameController extends ChangeNotifier {
   final HostLink? hostLink;
   final ClientLink? clientLink;
   final math.Random _rng;
+  final void Function(GameSound sound) _playSound;
   final List<StreamSubscription<Object?>> _subs = [];
 
   MatchConfig _config;
@@ -104,6 +109,12 @@ class GameController extends ChangeNotifier {
   /// Dernier événement marquant (capture, six, arrivée...).
   String eventText = '';
   MessageTone eventTone = MessageTone.neutral;
+
+  /// Augmente à chaque pion avalé : déclenche l'apparition du masque.
+  int captureFlash = 0;
+
+  /// Siège du joueur qui vient d'avaler un pion (son masque apparaît).
+  int captureSeat = 0;
 
   /// Renseigné si la connexion avec l'hôte est perdue.
   String? connectionLost;
@@ -213,7 +224,7 @@ class GameController extends ChangeNotifier {
 
   void _authorityRoll(int expectedTurn) {
     if (_auth.turn != expectedTurn || _auth.phase != Phase.rolling) return;
-    final value = 1 + _rng.nextInt(6);
+    final value = Dice.roll(_rng);
     final seat = _auth.current;
     final result = Rules.roll(_auth, value);
     _auth = result.state;
@@ -444,6 +455,7 @@ class GameController extends ChangeNotifier {
         eventText = '';
         eventTone = MessageTone.neutral;
         diceRolling = true;
+        _playSound(GameSound.dice);
         _notify();
         if (!await _hold(GameTiming.roll, epoch)) return;
         diceRolling = false;
@@ -463,8 +475,8 @@ class GameController extends ChangeNotifier {
           case RollEnd.noMoveRollAgain:
             eventText = 'Six ! Aucun pion ne peut avancer, $name relance';
             eventTone = MessageTone.good;
-          case RollEnd.threeSixes:
-            eventText = 'Trois 6 de suite : $name passe son tour';
+          case RollEnd.tooManySixes:
+            eventText = '${Rules.maxSixesInARow + 1} fois 6 de suite : $name passe son tour';
             eventTone = MessageTone.bad;
         }
         _notify();
@@ -504,8 +516,11 @@ class GameController extends ChangeNotifier {
     if (event.captures.isNotEmpty) {
       final victims = {for (final c in event.captures) nameOf(c.seat)}.join(' et ');
       eventText = event.captures.length > 1
-          ? '$name capture ${event.captures.length} pions de $victims !'
-          : '$name capture un pion de $victims !';
+          ? '$name avale ${event.captures.length} pions de $victims !'
+          : '$name avale un pion de $victims !';
+      captureSeat = event.seat;
+      captureFlash++;
+      _playSound(GameSound.capture);
       HapticFeedback.heavyImpact();
     } else if (event.seatFinished) {
       final place = event.state.ranking.indexOf(event.seat) + 1;
@@ -516,17 +531,10 @@ class GameController extends ChangeNotifier {
       eventText = '$name rentre un pion à la toguna';
     } else {
       eventTone = MessageTone.neutral;
-      final sheltered = event.from >= 0 &&
-          event.to <= Board.lastTrackStep &&
-          Board.isSafeStep(event.seat, event.to);
       final again = !event.state.isOver &&
           event.state.phase == Phase.rolling &&
           event.state.current == event.seat;
-      if (sheltered) {
-        eventText = again ? '$name est à l\'abri et rejoue' : '$name est à l\'abri';
-      } else {
-        eventText = again ? '$name rejoue' : '';
-      }
+      eventText = again ? '$name rejoue' : '';
     }
   }
 

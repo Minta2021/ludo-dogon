@@ -23,6 +23,8 @@ enum DogonIcon {
   refresh,
   book,
   chevron,
+  sound,
+  soundOff,
 }
 
 /// Icône du masque d'un siège (0 = Kanaga, 1 = Sirige, 2 = Walu, 3 = Satimbe).
@@ -190,6 +192,14 @@ void paintDogonIcon(Canvas canvas, Rect rect, DogonIcon icon, Color color,
       curve(5, 12, 5, 15.9, 8.1, 19, 12, 19);
       curve(12, 19, 14.4, 19, 16.5, 17.8, 17.8, 16);
       line([[18, 20], [18, 15.8], [13.8, 15.8]]);
+    case DogonIcon.sound:
+      line([[4, 9.5], [8, 9.5], [13, 5], [13, 19], [8, 14.5], [4, 14.5]], close: true);
+      curve(16, 9, 17.3, 10.2, 17.3, 13.8, 16, 15);
+      curve(18.5, 6.5, 21.5, 9.5, 21.5, 14.5, 18.5, 17.5);
+    case DogonIcon.soundOff:
+      line([[4, 9.5], [8, 9.5], [13, 5], [13, 19], [8, 14.5], [4, 14.5]], close: true);
+      line([[16.5, 9.5], [21.5, 14.5]]);
+      line([[21.5, 9.5], [16.5, 14.5]]);
     case DogonIcon.book:
       line([[4, 5], [10, 5], [12, 7], [14, 5], [20, 5], [20, 18], [14, 18], [12, 20], [10, 18], [4, 18]], close: true);
       line([[12, 7], [12, 20]]);

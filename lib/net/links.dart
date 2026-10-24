@@ -6,7 +6,7 @@
 library;
 
 /// Version du protocole échangé entre téléphones.
-const int protocolVersion = 1;
+const int protocolVersion = 2;
 
 /// Intention envoyée par un invité.
 class RemoteIntent {

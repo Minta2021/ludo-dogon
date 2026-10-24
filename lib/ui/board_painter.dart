@@ -98,11 +98,6 @@ class BoardPainter extends CustomPainter {
       canvas.drawRect(
           r, fill..color = startSeat != null ? seatColor(startSeat) : DogonColors.banco);
       canvas.drawRect(r, line);
-      if (Board.isGranaryIndex(i)) {
-        paintDogonIcon(canvas, r.deflate(cell * 0.14), DogonIcon.granary,
-            DogonColors.earthText,
-            strokeWidth: 2.2);
-      }
       if (startSeat != null) {
         // Flèche indiquant le sens de départ.
         final from = cellRect(Board.track[i]).center;

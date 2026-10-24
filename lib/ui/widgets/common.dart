@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../services/sound.dart';
 import '../board_painter.dart';
 import '../dogon_icons.dart';
 import '../theme.dart';
@@ -75,6 +76,24 @@ class SquareIconButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Bouton qui active ou coupe les sons du jeu.
+class SoundToggleButton extends StatelessWidget {
+  const SoundToggleButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final fx = SoundFx.instance;
+    return ListenableBuilder(
+      listenable: fx,
+      builder: (context, _) => SquareIconButton(
+        icon: fx.enabled ? DogonIcon.sound : DogonIcon.soundOff,
+        label: fx.enabled ? 'Couper le son' : 'Activer le son',
+        onPressed: () => fx.setEnabled(!fx.enabled),
       ),
     );
   }

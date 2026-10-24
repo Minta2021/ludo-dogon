@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ludo_dogon/game/ai.dart';
 import 'package:ludo_dogon/game/board.dart';
+import 'package:ludo_dogon/game/dice.dart';
 import 'package:ludo_dogon/game/rules.dart';
 
 /// Construit un état avec des pions placés à la main.
@@ -74,12 +75,12 @@ void main() {
       expect(Board.cellFor(3, 0), const GridPos(13, 6));
     });
 
-    test('huit cases protégées', () {
-      final safe = [
+    test('quatre cases de départ', () {
+      final starts = [
         for (var i = 0; i < Board.trackLength; i++)
-          if (Board.isSafeIndex(i)) i
+          if (Board.isStartIndex(i)) i
       ];
-      expect(safe, [0, 8, 13, 21, 26, 34, 39, 47]);
+      expect(starts, [0, 13, 26, 39]);
     });
   });
 
@@ -101,7 +102,7 @@ void main() {
     });
   });
 
-  group('Captures', () {
+  group('Avaler', () {
     test('tomber sur un adversaire le renvoie à sa base', () {
       // Siège 0 à l'étape 3 (case 3), siège 1 à l'étape 44 (case (13+44)%52 = 5).
       final s = stateWith({0: [3, -1, -1, -1], 1: [44, -1, -1, -1]},
@@ -114,23 +115,34 @@ void main() {
       expect(m.state.current, 0);
     });
 
-    test('pas de capture sur un grenier', () {
-      // Case 8 = grenier. Siège 1 à l'étape 47 -> case (13+47)%52 = 8.
+    test('on avale aussi sur l\'ancien grenier', () {
+      // Case 8. Siège 1 à l'étape 47 -> case (13+47)%52 = 8.
       final s = stateWith({0: [5, -1, -1, -1], 1: [47, -1, -1, -1]},
           seats: [0, 1], dice: 3, phase: Phase.moving);
       final m = Rules.move(s, 0);
-      expect(m.captures, isEmpty);
-      expect(m.state.steps[1][0], 47);
-      expect(m.extraTurn, isFalse);
-      expect(m.state.current, 1);
+      expect(m.captures.length, 1);
+      expect(m.state.steps[1][0], Board.inBase);
+      expect(m.extraTurn, isTrue);
+      expect(m.state.current, 0);
     });
 
-    test('pas de capture sur une case de départ', () {
+    test('on avale aussi sur la case de départ d\'un adversaire', () {
       // Case 13 = départ du siège 1.
       final s = stateWith({0: [10, -1, -1, -1], 1: [0, -1, -1, -1]},
           seats: [0, 1], dice: 3, phase: Phase.moving);
       final m = Rules.move(s, 0);
-      expect(m.captures, isEmpty);
+      expect(m.captures.length, 1);
+      expect(m.captures.first.seat, 1);
+    });
+
+    test('sortir de sa base avale le pion posé sur sa case de départ', () {
+      // Siège 1 à l'étape 39 -> case (13+39)%52 = 0, départ du siège 0.
+      final s = stateWith({0: [-1, -1, -1, -1], 1: [39, -1, -1, -1]},
+          seats: [0, 1], dice: 6, phase: Phase.moving);
+      final m = Rules.move(s, 0);
+      expect(m.to, 0);
+      expect(m.captures.length, 1);
+      expect(m.state.steps[1][0], Board.inBase);
     });
 
     test('tous les pions adverses de la case sont capturés', () {
@@ -217,10 +229,23 @@ void main() {
       expect(r.state.sixes, 1);
     });
 
-    test('trois 6 de suite font perdre le tour', () {
-      final s = stateWith({0: [10, -1, -1, -1]}, seats: [0, 1], sixes: 2);
+    test('on peut jouer jusqu\'à cinq 6 de suite', () {
+      var s = stateWith({0: [10, -1, -1, -1]}, seats: [0, 1]);
+      for (var i = 1; i <= Rules.maxSixesInARow; i++) {
+        final r = Rules.roll(s, 6);
+        expect(r.end, RollEnd.mustMove, reason: '6 n°$i');
+        final m = Rules.move(r.state, 0);
+        expect(m.extraTurn, isTrue);
+        expect(m.state.current, 0);
+        expect(m.state.sixes, i);
+        s = m.state;
+      }
+    });
+
+    test('le sixième 6 d\'affilée fait perdre le tour', () {
+      final s = stateWith({0: [10, -1, -1, -1]}, seats: [0, 1], sixes: 5);
       final r = Rules.roll(s, 6);
-      expect(r.end, RollEnd.threeSixes);
+      expect(r.end, RollEnd.tooManySixes);
       expect(r.state.current, 1);
       expect(r.state.sixes, 0);
     });
@@ -232,6 +257,24 @@ void main() {
       expect(m.state.sixes, 1);
       final r2 = Rules.roll(m.state, 2);
       expect(r2.state.sixes, 0);
+    });
+  });
+
+  group('Dé', () {
+    test('le 6 sort environ une fois sur quatre', () {
+      final rng = Random(3);
+      final counts = List.filled(7, 0);
+      const n = 200000;
+      for (var i = 0; i < n; i++) {
+        counts[Dice.roll(rng)]++;
+      }
+      expect(counts[0], 0);
+      expect(counts[6] / n, greaterThan(0.24));
+      expect(counts[6] / n, lessThan(0.26));
+      for (var v = 1; v <= 5; v++) {
+        expect(counts[v] / n, greaterThan(0.14), reason: 'face $v');
+        expect(counts[v] / n, lessThan(0.16), reason: 'face $v');
+      }
     });
   });
 
@@ -279,7 +322,7 @@ void main() {
         var actions = 0;
         while (!state.isOver) {
           expect(actions < 20000, isTrue, reason: 'partie $game bloquée');
-          final roll = Rules.roll(state, 1 + rng.nextInt(6));
+          final roll = Rules.roll(state, Dice.roll(rng));
           state = roll.state;
           if (roll.end == RollEnd.mustMove) {
             final pawn = Bot.choosePawn(state, roll.legal, rng,
@@ -297,14 +340,13 @@ void main() {
 }
 
 void _checkInvariants(GameState s) {
-  // Deux couleurs différentes ne partagent jamais une case non protégée.
+  // Sans abri, deux couleurs différentes ne partagent jamais une case.
   final owners = <int, int>{};
   for (final seat in s.seats) {
     for (final step in s.steps[seat]) {
       expect(step >= -1 && step <= Board.homeStep, isTrue);
       if (step < 0 || step > Board.lastTrackStep) continue;
       final index = Board.absoluteIndex(seat, step);
-      if (Board.isSafeIndex(index)) continue;
       final owner = owners[index];
       expect(owner == null || owner == seat, isTrue,
           reason: 'case $index partagée par $owner et $seat');

@@ -97,11 +97,16 @@ plupart des téléphones Android : Tecno, Infinix, Itel, Samsung…).
 ## 5. Règles appliquées
 
 - 4 pions par joueur ; il faut un **6** pour sortir un pion.
-- Un **6** donne un nouveau lancer ; **trois 6 de suite** font perdre le tour.
-- Tomber sur un pion adverse le **renvoie à sa base** et donne un nouveau lancer.
-- Les **cases de départ** et les **greniers** sont des abris : pas de capture.
-- Après un tour complet, le pion entre dans son couloir ; il faut le **nombre
-  exact** pour atteindre la **toguna** (le centre), ce qui donne un nouveau lancer.
+- Le **6 sort plus souvent** qu'avec un dé ordinaire : 1 chance sur 4
+  (constante `sixChance` dans `lib/game/dice.dart`).
+- Un **6** donne un nouveau lancer, **jusqu'à cinq 6 de suite** ; au sixième 6
+  d'affilée, le tour est perdu (constante `maxSixesInARow` dans `lib/game/rules.dart`).
+- Tomber sur un pion adverse l'**avale** : il retourne à sa base et le joueur
+  rejoue. On peut avaler **partout sur le parcours**, cases de départ comprises.
+  Un cri retentit et le masque du joueur apparaît sur le plateau.
+- Après un tour complet, le pion entre dans son couloir (où personne ne peut
+  l'avaler) ; il faut le **nombre exact** pour atteindre la **toguna** (le
+  centre), ce qui donne un nouveau lancer.
 - Le premier qui rentre ses 4 pions gagne ; la partie continue pour les places
   suivantes.
 - Quand un seul coup est possible, il est joué automatiquement.
@@ -159,6 +164,14 @@ affichage et connexion Bluetooth réelle).
 - **Couleurs et polices** : `lib/ui/theme.dart`.
 - **Prénoms de l'ordinateur** : `botNames` dans `lib/models/match.dart`.
 - **Vitesse des animations** : `GameTiming` dans `lib/controllers/game_controller.dart`.
+- **Sons** : `android/app/src/main/res/raw/de.wav` (le dé) et
+  `cri_avale.wav` (le cri quand un pion est avalé). Ils ont été fabriqués par
+  ordinateur : pour mettre ta propre voix ou un vrai dé, enregistre un son
+  court (moins de 2 secondes), convertis-le en `.wav` ou `.ogg` et remplace le
+  fichier en gardant **exactement le même nom** (un seul fichier par nom).
+  Le bouton haut-parleur de l'accueil et du menu Pause coupe les sons.
+- **Chance d'avoir un 6** : `sixChance` dans `lib/game/dice.dart` (0,25 = 1 sur 4).
+- **Nombre de 6 de suite autorisés** : `maxSixesInARow` dans `lib/game/rules.dart`.
 - **Icône** : `android/app/src/main/res/mipmap-*` (image source :
   `assets/icon/ludo_dogon_512.png`).
 - **Nom de l'appli** : `android:label` dans `android/app/src/main/AndroidManifest.xml`.
