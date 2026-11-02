@@ -47,6 +47,13 @@ class FighterFrame {
   final bool stars;
 }
 
+/// Trajet d'un pion avalé : de sa case jusqu'à sa place dans sa base.
+class VictimPath {
+  const VictimPath(this.spot, this.home);
+  final Pt spot;
+  final Pt home;
+}
+
 class FightFrame {
   const FightFrame({
     required this.attacker,
@@ -80,8 +87,9 @@ double _seg(double t, double a, double b) => ((t - a) / (b - a)).clamp(0.0, 1.0)
 /// Image de la prise de karaté à l'instant [t] (0 à 1).
 ///
 /// [start] : où se trouve l'attaquant avant de sauter ; [target] : la case
-/// du pion avalé ; [homes] : les places de base où retournent les pions avalés.
-FightFrame fightFrame(double t, Pt start, Pt target, List<Pt> homes) {
+/// où il frappe ; [victims] : d'où partent les pions avalés et où ils
+/// retournent dans leur base.
+FightFrame fightFrame(double t, Pt start, Pt target, List<VictimPath> victims) {
   final delta = target - start;
   final dist = delta.length;
   final dir = dist < 1e-6 ? const Pt(1, 0) : delta * (1 / dist);
@@ -135,13 +143,19 @@ FightFrame fightFrame(double t, Pt start, Pt target, List<Pt> homes) {
   }
 
   // --- Pions avalés --------------------------------------------------------
-  final victims = <FighterFrame>[];
-  for (var i = 0; i < homes.length; i++) {
-    final home = homes[i];
-    final spot = homes.length > 1 ? target + Pt(i == 0 ? -0.2 : 0.2, 0) : target;
+  final frames = <FighterFrame>[];
+  // Pions avalés sur la même case : légèrement décalés.
+  final sameCell = victims.where((v) => (v.spot - target).length < 0.3).length;
+  var nth = 0;
+  for (final v in victims) {
+    final home = v.home;
+    var spot = v.spot;
+    if (sameCell > 1 && (spot - target).length < 0.3) {
+      spot = spot + Pt(nth++ == 0 ? -0.2 : 0.2, 0);
+    }
     if (t < FightTiming.impact) {
       final scare = _ease(_seg(t, FightTiming.windupEnd + 0.06, FightTiming.impact));
-      victims.add(FighterFrame(
+      frames.add(FighterFrame(
         feet: spot,
         lift: 0,
         pose: LutinPose.lerp(LutinPose.idle, LutinPose.scared, scare),
@@ -155,7 +169,7 @@ FightFrame fightFrame(double t, Pt start, Pt target, List<Pt> homes) {
       final feet = Pt.lerp(spot, home, u);
       // Ne pas sortir du plateau par le haut (le lutin mesure ~1,5 case).
       final maxLift = math.max(0.3, feet.y - 1.5);
-      victims.add(FighterFrame(
+      frames.add(FighterFrame(
         feet: feet,
         lift: math.min(arc * 4 * u * (1 - u), maxLift),
         pose: LutinPose.hit,
@@ -165,7 +179,7 @@ FightFrame fightFrame(double t, Pt start, Pt target, List<Pt> homes) {
       ));
     } else {
       final u = _seg(t, FightTiming.victimLanded, 1);
-      victims.add(FighterFrame(
+      frames.add(FighterFrame(
         feet: home,
         lift: 0,
         pose: LutinPose.lerp(
@@ -181,7 +195,7 @@ FightFrame fightFrame(double t, Pt start, Pt target, List<Pt> homes) {
   final impactU = (t - FightTiming.impact) / FightTiming.impactLength;
   return FightFrame(
     attacker: attacker,
-    victims: victims,
+    victims: frames,
     impact: impactU >= 0 && impactU <= 1 ? impactU : null,
     impactAt: Pt.lerp(contact, target, 0.55),
   );

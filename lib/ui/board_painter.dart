@@ -98,7 +98,20 @@ class BoardPainter extends CustomPainter {
       canvas.drawRect(
           r, fill..color = startSeat != null ? seatColor(startSeat) : DogonColors.banco);
       canvas.drawRect(r, line);
+      if (Board.isStarIndex(i)) {
+        // Étoile : zone neutre où personne ne peut être avalé.
+        canvas.drawRect(r.deflate(cell * 0.04), fill..color = const Color(0xFFE6CC98));
+        _star(canvas, r.center, cell * 0.4);
+      }
       if (startSeat != null) {
+        // Tapis : bordure tissée, on y est à l'abri.
+        final mat = RRect.fromRectAndRadius(r.deflate(cell * 0.12), Radius.circular(cell * 0.08));
+        canvas.drawRRect(
+            mat,
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = math.max(1, cell * 0.06)
+              ..color = DogonColors.kaolin.withValues(alpha: 0.75));
         // Flèche indiquant le sens de départ.
         final from = cellRect(Board.track[i]).center;
         final to = cellRect(Board.track[(i + 1) % Board.trackLength]).center;
@@ -154,6 +167,29 @@ class BoardPainter extends CustomPainter {
 
     // Cadre.
     canvas.drawRect(Offset.zero & size, dark..strokeWidth = math.max(2, cell * 0.14));
+  }
+
+  void _star(Canvas canvas, Offset c, double radius) {
+    final path = Path();
+    for (var i = 0; i < 10; i++) {
+      final a = -math.pi / 2 + i * math.pi / 5;
+      final r = i.isEven ? radius : radius * 0.45;
+      final p = c + Offset(math.cos(a) * r, math.sin(a) * r);
+      if (i == 0) {
+        path.moveTo(p.dx, p.dy);
+      } else {
+        path.lineTo(p.dx, p.dy);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, Paint()..color = const Color(0xFFF2C14E));
+    canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeJoin = StrokeJoin.round
+          ..strokeWidth = math.max(1.2, radius * 0.16)
+          ..color = DogonColors.nightDeep);
   }
 
   void _dashedCircle(Canvas canvas, Offset c, double radius, Paint paint) {

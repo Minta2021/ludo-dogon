@@ -67,36 +67,48 @@ abstract final class Bot {
     final toIndex =
         to <= Board.lastTrackStep ? Board.absoluteIndex(seat, to) : null;
 
-    // Sans abri, le danger existe partout sur le parcours.
     if (toIndex != null) {
-      score -= 45 * threatsOn(result.state, seat, toIndex);
-      score += 6 * targetsAhead(result.state, seat, to);
+      if (Board.isSafeIndex(toIndex)) {
+        score += 25; // tapis ou étoile : à l'abri
+      } else {
+        score -= 45 * threatsOn(result.state, seat, toIndex);
+        score += 6 * targetsAhead(result.state, seat, to);
+      }
     }
-    if (fromIndex != null) {
+    if (fromIndex != null && !Board.isSafeIndex(fromIndex)) {
       score += 38 * threatsOn(state, seat, fromIndex); // s'échapper
+    }
+    if (fromIndex != null &&
+        Board.isSafeIndex(fromIndex) &&
+        toIndex != null &&
+        !Board.isSafeIndex(toIndex)) {
+      score -= 8; // quitter un abri sans raison
+    }
+    // Dernier pion qui entre dans sa maison : il y sera attaquable.
+    if (to > Board.lastTrackStep && to < Board.homeStep) {
+      final othersHome = [
+        for (var p = 0; p < Board.pawnsPerPlayer; p++)
+          if (p != pawn && state.steps[seat][p] == Board.homeStep) p
+      ].length;
+      if (othersHome == Board.pawnsPerPlayer - 1) score -= 10;
     }
     score += to * 0.5; // à égalité, faire avancer le plus avancé
     return score;
   }
 
   /// Nombre de pions adverses qui pourraient tomber pile sur la case
-  /// [index] du parcours au prochain lancer (y compris un pion qui sort de
-  /// sa base sur sa case de départ avec un 6).
+  /// [index] du parcours au prochain lancer (0 sur un abri).
   static int threatsOn(GameState state, int seat, int index) {
+    if (Board.isSafeIndex(index)) return 0;
     var threats = 0;
     for (final other in state.seats) {
       if (other == seat || state.ranking.contains(other)) continue;
       for (final s in state.steps[other]) {
-        if (s == Board.inBase) continue;
-        if (s > Board.lastTrackStep) continue;
+        if (s < 0 || s > Board.lastTrackStep) continue;
         final distance = (index - Board.absoluteIndex(other, s)) % Board.trackLength;
         if (distance >= 1 && distance <= 6 && s + distance <= Board.lastTrackStep) {
           threats++;
         }
-      }
-      if (index == Board.startIndex(other) &&
-          state.steps[other].contains(Board.inBase)) {
-        threats++;
       }
     }
     return threats;
@@ -112,6 +124,7 @@ abstract final class Bot {
       for (final s in state.steps[other]) {
         if (s < 0 || s > Board.lastTrackStep) continue;
         final target = Board.absoluteIndex(other, s);
+        if (Board.isSafeIndex(target)) continue;
         final distance = (target - index) % Board.trackLength;
         if (distance >= 1 && distance <= 6 && step + distance <= Board.lastTrackStep) {
           targets++;

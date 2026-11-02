@@ -116,10 +116,17 @@ Nearby (par exemple `8034`). Le bouton **Copier** permet de l'envoyer.
 - Tomber sur un lutin adverse l'**avale** : le vainqueur lui fait une **prise
   de karaté** (coup de pied sauté, « PAF ! »), le lutin avalé s'envole vers sa
   base en tournoyant, puis le masque du vainqueur apparaît. Le joueur rejoue.
-  On peut avaler **partout sur le parcours**, cases de départ comprises.
-- Après un tour complet, le pion entre dans son couloir (où personne ne peut
-  l'avaler) ; il faut le **nombre exact** pour atteindre la **toguna** (le
-  centre), ce qui donne un nouveau lancer.
+- **Huit abris** où l'on ne peut pas être avalé : les **4 tapis** (cases de
+  départ colorées, à bordure tissée) et les **4 étoiles** placées entre les
+  tapis. Plusieurs lutins peuvent s'y côtoyer.
+- **Dernier lutin** : quand un joueur n'a plus qu'un lutin en jeu (les trois
+  autres sont arrivés) et qu'il attend dans sa maison (son couloir de
+  couleur), un adversaire qui fait le **nombre exact** y entre, l'avale, puis
+  ressort sur la case devant cette maison. Le lutin menacé tremble.
+- Après un tour complet, le pion entre dans son couloir, sa maison (où
+  personne ne peut l'avaler, sauf le cas du dernier lutin ci-dessus) ; il faut
+  le **nombre exact** pour atteindre la **toguna** (le centre), ce qui donne un
+  nouveau lancer.
 - Le premier qui rentre ses 4 pions gagne ; la partie continue pour les places
   suivantes.
 - Quand un seul coup est possible, il est joué automatiquement.
@@ -190,6 +197,8 @@ affichage et connexion Bluetooth réelle).
   court (moins de 2 secondes), convertis-le en `.wav` ou `.ogg` et remplace le
   fichier en gardant **exactement le même nom** (un seul fichier par nom).
   Le bouton haut-parleur de l'accueil et du menu Pause coupe les sons.
+- **Abris** : `isSafeIndex` dans `lib/game/board.dart` ; entrée dans la maison
+  adverse : `raidFor` dans `lib/game/rules.dart`.
 - **Chance d'avoir un 6** : `sixChance` dans `lib/game/dice.dart` (0,25 = 1 sur 4).
 - **Nombre de 6 de suite autorisés** : `maxSixesInARow` dans `lib/game/rules.dart`.
 - **Icône** : `android/app/src/main/res/mipmap-*` (image source :

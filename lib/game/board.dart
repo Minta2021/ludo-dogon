@@ -94,8 +94,17 @@ abstract final class Board {
     return (startIndex(seat) + step) % trackLength;
   }
 
-  /// Case de départ d'un des sièges (une par siège).
+  /// Case de départ (« tapis ») d'un des sièges : une par siège.
   static bool isStartIndex(int index) => index % 13 == 0;
+
+  /// Case étoile : zone neutre entre deux tapis, huit cases après chaque départ.
+  static bool isStarIndex(int index) => index % 13 == 8;
+
+  /// Abri : sur un tapis ou une étoile, aucun pion ne peut être avalé.
+  static bool isSafeIndex(int index) => isStartIndex(index) || isStarIndex(index);
+
+  /// Vrai si l'étape est dans le couloir d'arrivée (la « maison »).
+  static bool isLaneStep(int step) => step > lastTrackStep && step < homeStep;
 
   /// Siège dont [index] est la case de départ, sinon null.
   static int? startSeatOf(int index) => isStartIndex(index) ? index ~/ 13 : null;
@@ -107,4 +116,23 @@ abstract final class Board {
     if (step <= lastTrackStep) return track[absoluteIndex(seat, step)];
     return lanes[seat][step - lastTrackStep - 1];
   }
+}
+
+/// Où se trouve un pion pour l'affichage : une étape comptée depuis le
+/// départ du siège [seat]. Sert aussi à placer un pion dans la maison d'un
+/// autre joueur (quand il y entre pour avaler son dernier lutin).
+class Spot {
+  const Spot(this.seat, this.step);
+
+  final int seat;
+  final int step;
+
+  @override
+  bool operator ==(Object other) => other is Spot && other.seat == seat && other.step == step;
+
+  @override
+  int get hashCode => seat * 100 + step;
+
+  @override
+  String toString() => 'Spot($seat, $step)';
 }

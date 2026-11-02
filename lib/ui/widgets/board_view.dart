@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/game_controller.dart';
 import '../../game/board.dart';
+import '../../game/rules.dart';
 import '../board_geometry.dart';
 import '../board_painter.dart';
 import '../theme.dart';
@@ -37,6 +38,7 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
 
   /// Dernier sens de marche de chaque lutin (siège * 4 + pion).
   final Map<int, bool> _facingLeft = {};
+  final Map<int, Offset> _lastFeet = {};
 
   @override
   void dispose() {
@@ -93,18 +95,20 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
     final entries = <_PawnEntry>[];
     final byCell = <GridPos, List<_PawnEntry>>{};
     for (final seat in state.seats) {
+      final exposed = Rules.exposedPawn(state, seat);
       for (var pawn = 0; pawn < Board.pawnsPerPlayer; pawn++) {
-        final step = c.displayStep(seat, pawn);
+        final spot = c.displaySpot(seat, pawn);
         final e = _PawnEntry(
           seat: seat,
           pawn: pawn,
-          step: step,
+          spot: spot,
           movable: seat == state.current && movable.contains(pawn),
           hopping: c.hoppingKey == seat * 4 + pawn,
           hidden: fight?.involves(seat, pawn) ?? false,
+          exposed: exposed == pawn && spot.seat == seat,
         );
         entries.add(e);
-        final cellPos = Board.cellFor(seat, step);
+        final cellPos = Board.cellFor(spot.seat, spot.step);
         if (cellPos != null && !e.hidden) (byCell[cellPos] ??= []).add(e);
       }
     }
@@ -117,12 +121,15 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
       }
     }
     for (final e in entries) {
-      e.feet = _feet(e.seat, e.pawn, e.step, stack: e.stackOffset);
-      if (e.hopping) {
-        final prev = _feet(e.seat, e.pawn, e.step - 1);
-        final dx = e.feet.dx - prev.dx;
-        if (dx.abs() > 0.05) _facingLeft[e.seat * 4 + e.pawn] = dx < 0;
+      e.feet = _feet(e.spot.seat, e.pawn, e.spot.step, stack: e.stackOffset);
+      // Le lutin regarde dans le sens où il vient de se déplacer.
+      final key = e.seat * 4 + e.pawn;
+      final last = _lastFeet[key];
+      if (last != null && e.hopping) {
+        final dx = e.feet.dx - last.dx;
+        if (dx.abs() > 0.05) _facingLeft[key] = dx < 0;
       }
+      _lastFeet[key] = e.feet;
     }
 
     // Du fond vers l'avant : les lutins plus bas passent devant ; les pions
@@ -171,15 +178,18 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
     return FightScene(
       attackerSeat: f.seat,
       victimSeats: [for (final v in f.victims) v.seat],
-      start: pt(_feet(f.seat, f.pawn, f.fromStep)),
-      target: pt(_feet(f.seat, f.pawn, f.toStep)),
-      homes: [for (final v in f.victims) pt(_feet(v.seat, v.pawn, Board.inBase))],
+      start: pt(_feet(f.from.seat, f.pawn, f.from.step)),
+      target: pt(_feet(f.to.seat, f.pawn, f.to.step)),
+      victims: [
+        for (final v in f.victims)
+          VictimPath(pt(_feet(v.seat, v.pawn, v.from)), pt(_feet(v.seat, v.pawn, Board.inBase))),
+      ],
     );
   }
 
   Widget _positionedPawn(_PawnEntry e, double cell) {
     final double width;
-    if (e.step >= Board.homeStep) {
+    if (e.spot.step >= Board.homeStep) {
       width = cell * 0.58;
     } else if (e.stacked) {
       width = cell * 0.8;
@@ -208,6 +218,21 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
             facingLeft: facing,
           );
         },
+      );
+    } else if (e.exposed && !e.hopping) {
+      // Le dernier lutin d'un joueur, attaquable dans sa maison, tremble.
+      pawn = AnimatedBuilder(
+        animation: _pulse,
+        builder: (context, child) => Transform.translate(
+          offset: Offset(math.sin(_pulse.value * math.pi * 6) * width * 0.035, 0),
+          child: child,
+        ),
+        child: LutinView(
+          seat: e.seat,
+          width: width,
+          pose: LutinPose.lerp(LutinPose.idle, LutinPose.scared, 0.55),
+          facingLeft: facing,
+        ),
       );
     } else {
       pawn = LutinView(
@@ -254,15 +279,21 @@ class _PawnEntry {
   _PawnEntry({
     required this.seat,
     required this.pawn,
-    required this.step,
+    required this.spot,
     required this.movable,
     required this.hopping,
     required this.hidden,
+    required this.exposed,
   });
 
   final int seat;
   final int pawn;
-  final int step;
+
+  /// Où il est affiché (parfois dans la maison d'un autre joueur).
+  final Spot spot;
+
+  /// Dernier lutin du joueur, attaquable dans sa maison.
+  final bool exposed;
   final bool movable;
   final bool hopping;
 

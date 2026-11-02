@@ -106,7 +106,8 @@ class GameController extends ChangeNotifier {
   int? get diceFace => _diceFace ?? _state.dice;
   int? _diceFace;
 
-  final Map<int, int> _stepOverride = {};
+  /// Position affichée d'un pion pendant une animation (siège * 4 + pion).
+  final Map<int, Spot> _spotOverride = {};
 
   /// Pion en train de sauter de case en case (siège * 4 + pion).
   int? hoppingKey;
@@ -133,8 +134,10 @@ class GameController extends ChangeNotifier {
 
   bool get isAuthority => clientLink == null;
 
-  int displayStep(int seat, int pawn) =>
-      _stepOverride[seat * 4 + pawn] ?? _state.steps[seat][pawn];
+  /// Où afficher un pion (pendant une animation, il peut se trouver dans la
+  /// maison d'un autre joueur).
+  Spot displaySpot(int seat, int pawn) =>
+      _spotOverride[seat * 4 + pawn] ?? Spot(seat, _state.steps[seat][pawn]);
 
   String nameOf(int seat) => _config.nameOf(seat);
 
@@ -215,7 +218,7 @@ class GameController extends ChangeNotifier {
     _epoch++;
     _cancelTimers();
     _queue.clear();
-    _stepOverride.clear();
+    _spotOverride.clear();
     hoppingKey = null;
     fight = null;
     diceRolling = false;
@@ -386,7 +389,7 @@ class GameController extends ChangeNotifier {
           _applyPlayers(message['players']);
           if (!_playing && _queue.isEmpty) {
             _state = GameState.fromJson((message['state'] as Map).cast<String, Object?>());
-            _stepOverride.clear();
+            _spotOverride.clear();
           }
           _notify();
         case 'seat':
@@ -496,34 +499,26 @@ class GameController extends ChangeNotifier {
       case MoveEvent():
         final key = event.seat * 4 + event.pawn;
         final capture = event.captures.isNotEmpty;
-        final path = event.path;
+        final spots = event.spots;
         // En cas de prise, la dernière case se gagne d'un coup de pied sauté.
-        final walk = capture ? path.sublist(0, path.length - 1) : path;
-        hoppingKey = key;
-        for (final step in walk) {
-          _stepOverride[key] = step;
-          _notify();
-          final pause = event.from < 0 ? GameTiming.exitBase : GameTiming.hop;
-          if (!await _hold(pause, epoch)) {
-            _stepOverride.clear();
-            hoppingKey = null;
-            return;
-          }
+        final walk = capture ? spots.sublist(0, spots.length - 1) : spots;
+        if (!await _hop(key, walk, event.from < 0 ? GameTiming.exitBase : GameTiming.hop, epoch)) {
+          return;
         }
-        hoppingKey = null;
         if (capture) {
+          final target = spots.last;
           fight = FightInfo(
             id: ++_fightIds,
             seat: event.seat,
             pawn: event.pawn,
-            fromStep: walk.isEmpty ? event.from : walk.last,
-            toStep: event.to,
+            from: walk.isEmpty ? Spot(event.seat, event.from) : walk.last,
+            to: target,
             victims: event.captures,
           );
-          // Sous la scène, les pions rejoignent déjà leur place finale (cachés).
-          _stepOverride[key] = event.to;
+          // Sous la scène, les pions rejoignent déjà leur place (cachés).
+          _spotOverride[key] = target;
           for (final v in event.captures) {
-            _stepOverride[v.seat * 4 + v.pawn] = Board.inBase;
+            _spotOverride[v.seat * 4 + v.pawn] = Spot(v.seat, Board.inBase);
           }
           _playSound(GameSound.capture);
           _notify();
@@ -534,12 +529,22 @@ class GameController extends ChangeNotifier {
           }
           if (!impactOk || !await _hold(GameTiming.fight - GameTiming.fightImpact, epoch)) {
             fight = null;
-            _stepOverride.clear();
+            _spotOverride.clear();
             return;
           }
           fight = null;
+          // Après être entré dans une maison adverse, le lutin en ressort
+          // jusqu'à la case devant cette maison.
+          final raid = event.raid;
+          if (raid != null) {
+            final back = [
+              for (var l = raid.lane - 1; l >= 1; l--) Spot(raid.seat, Board.lastTrackStep + l),
+              Spot(event.seat, event.to),
+            ];
+            if (!await _hop(key, back, GameTiming.hop, epoch)) return;
+          }
         }
-        _stepOverride.clear();
+        _spotOverride.clear();
         hoppingKey = null;
         _state = event.state;
         _describeMove(event, name);
@@ -554,13 +559,35 @@ class GameController extends ChangeNotifier {
     }
   }
 
+  /// Fait sauter le pion [key] de case en case ; faux si l'animation a été
+  /// interrompue (nouvelle partie).
+  Future<bool> _hop(int key, List<Spot> spots, Duration pause, int epoch) async {
+    hoppingKey = key;
+    for (final spot in spots) {
+      _spotOverride[key] = spot;
+      _notify();
+      if (!await _hold(pause, epoch)) {
+        _spotOverride.clear();
+        hoppingKey = null;
+        return false;
+      }
+    }
+    hoppingKey = null;
+    return true;
+  }
+
   void _describeMove(MoveEvent event, String name) {
     eventTone = MessageTone.good;
     if (event.captures.isNotEmpty) {
       final victims = {for (final c in event.captures) nameOf(c.seat)}.join(' et ');
-      eventText = event.captures.length > 1
-          ? '$name avale ${event.captures.length} pions de $victims !'
-          : '$name avale un pion de $victims !';
+      final raid = event.raid;
+      if (raid != null) {
+        eventText = '$name entre dans la maison de ${nameOf(raid.seat)} et avale son dernier lutin !';
+      } else {
+        eventText = event.captures.length > 1
+            ? '$name avale ${event.captures.length} lutins de $victims !'
+            : '$name avale un lutin de $victims !';
+      }
       captureSeat = event.seat;
       captureFlash++;
     } else if (event.seatFinished) {
@@ -606,8 +633,8 @@ class FightInfo {
     required this.id,
     required this.seat,
     required this.pawn,
-    required this.fromStep,
-    required this.toStep,
+    required this.from,
+    required this.to,
     required this.victims,
   });
 
@@ -615,9 +642,10 @@ class FightInfo {
   final int seat;
   final int pawn;
 
-  /// Étape d'où part le saut (-1 : depuis la base).
-  final int fromStep;
-  final int toStep;
+  /// D'où part le saut (étape -1 : depuis la base) et où il arrive (case du
+  /// pion avalé, éventuellement dans la maison d'un adversaire).
+  final Spot from;
+  final Spot to;
   final List<Capture> victims;
 
   bool involves(int seat, int pawn) =>

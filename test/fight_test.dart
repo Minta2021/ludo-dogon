@@ -25,7 +25,7 @@ class _CountingPen implements Pen {
 void main() {
   const start = Pt(2, 6);
   const target = Pt(5, 6);
-  const homes = [Pt(10, 2)];
+  const homes = [VictimPath(Pt(5, 6), Pt(10, 2))];
 
   group('Prise de karaté', () {
     test('l\'attaquant part de sa case et finit sur la case du pion avalé', () {
@@ -60,6 +60,14 @@ void main() {
           expect(v.feet.y - v.lift, greaterThanOrEqualTo(0.3));
         }
       }
+    });
+
+    test('un pion avalé ailleurs (devant une maison) part de sa propre case', () {
+      const two = [VictimPath(Pt(5, 6), Pt(10, 2)), VictimPath(Pt(7, 6), Pt(1, 1))];
+      final f = fightFrame(0.1, start, target, two);
+      expect(f.victims[1].feet.x, 7);
+      final end = fightFrame(1, start, target, two);
+      expect(end.victims[1].feet.x, 1);
     });
 
     test('l\'attaquant regarde sa cible', () {

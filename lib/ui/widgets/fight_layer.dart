@@ -15,14 +15,14 @@ class FightScene {
     required this.victimSeats,
     required this.start,
     required this.target,
-    required this.homes,
+    required this.victims,
   });
 
   final int attackerSeat;
   final List<int> victimSeats;
   final Pt start;
   final Pt target;
-  final List<Pt> homes;
+  final List<VictimPath> victims;
 }
 
 class FightLayer extends StatefulWidget {
@@ -81,7 +81,7 @@ class _FightPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final pen = CanvasPen(canvas);
-    final frame = fightFrame(t, scene.start, scene.target, scene.homes);
+    final frame = fightFrame(t, scene.start, scene.target, scene.victims);
     final unit = lutinWidth / 100;
 
     void fighter(FighterFrame f, int seat) {

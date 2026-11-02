@@ -75,6 +75,14 @@ void main() {
       expect(Board.cellFor(3, 0), const GridPos(13, 6));
     });
 
+    test('huit abris : quatre tapis et quatre étoiles', () {
+      final safe = [
+        for (var i = 0; i < Board.trackLength; i++)
+          if (Board.isSafeIndex(i)) i
+      ];
+      expect(safe, [0, 8, 13, 21, 26, 34, 39, 47]);
+    });
+
     test('quatre cases de départ', () {
       final starts = [
         for (var i = 0; i < Board.trackLength; i++)
@@ -115,34 +123,34 @@ void main() {
       expect(m.state.current, 0);
     });
 
-    test('on avale aussi sur l\'ancien grenier', () {
-      // Case 8. Siège 1 à l'étape 47 -> case (13+47)%52 = 8.
+    test('pas de capture sur une étoile', () {
+      // Case 8 = étoile. Siège 1 à l'étape 47 -> case (13+47)%52 = 8.
       final s = stateWith({0: [5, -1, -1, -1], 1: [47, -1, -1, -1]},
           seats: [0, 1], dice: 3, phase: Phase.moving);
       final m = Rules.move(s, 0);
-      expect(m.captures.length, 1);
-      expect(m.state.steps[1][0], Board.inBase);
-      expect(m.extraTurn, isTrue);
-      expect(m.state.current, 0);
+      expect(m.captures, isEmpty);
+      expect(m.state.steps[1][0], 47);
+      expect(m.extraTurn, isFalse);
+      expect(m.state.current, 1);
     });
 
-    test('on avale aussi sur la case de départ d\'un adversaire', () {
-      // Case 13 = départ du siège 1.
+    test('pas de capture sur un tapis (case de départ)', () {
+      // Case 13 = tapis du siège 1.
       final s = stateWith({0: [10, -1, -1, -1], 1: [0, -1, -1, -1]},
           seats: [0, 1], dice: 3, phase: Phase.moving);
       final m = Rules.move(s, 0);
-      expect(m.captures.length, 1);
-      expect(m.captures.first.seat, 1);
+      expect(m.captures, isEmpty);
+      expect(m.state.steps[1][0], 0);
     });
 
-    test('sortir de sa base avale le pion posé sur sa case de départ', () {
-      // Siège 1 à l'étape 39 -> case (13+39)%52 = 0, départ du siège 0.
+    test('sortir de sa base ne mange pas le pion posé sur son tapis', () {
+      // Siège 1 à l'étape 39 -> case (13+39)%52 = 0, tapis du siège 0.
       final s = stateWith({0: [-1, -1, -1, -1], 1: [39, -1, -1, -1]},
           seats: [0, 1], dice: 6, phase: Phase.moving);
       final m = Rules.move(s, 0);
       expect(m.to, 0);
-      expect(m.captures.length, 1);
-      expect(m.state.steps[1][0], Board.inBase);
+      expect(m.captures, isEmpty);
+      expect(m.state.steps[1][0], 39);
     });
 
     test('tous les pions adverses de la case sont capturés', () {
@@ -152,6 +160,18 @@ void main() {
       expect(m.captures.length, 2);
     });
 
+    test('un pion dans sa maison est à l\'abri tant qu\'il n\'est pas le dernier', () {
+      // Siège 0 : un pion dans sa maison (53) et un autre dans sa base.
+      // Siège 1 à l'étape 35 : la maison du siège 0 commence après l'étape 37.
+      final s = stateWith({0: [53, -1, 56, 56], 1: [35, -1, -1, -1]},
+          seats: [0, 1], current: 1, dice: 5, phase: Phase.moving);
+      final m = Rules.move(s, 0);
+      expect(m.raid, isNull);
+      expect(m.captures, isEmpty);
+      expect(m.to, 40);
+      expect(m.state.steps[0][0], 53);
+    });
+
     test('un pion dans son couloir ne peut pas être capturé', () {
       // Siège 1 dans son couloir (étape 52) ; le siège 0 passe à côté.
       final s = stateWith({0: [10, -1, -1, -1], 1: [52, -1, -1, -1]},
@@ -159,6 +179,66 @@ void main() {
       final m = Rules.move(s, 0);
       expect(m.captures, isEmpty);
       expect(m.state.steps[1][0], 52);
+    });
+  });
+
+  group('Entrer dans la maison adverse', () {
+    test('le dernier pion dans sa maison peut être avalé au nombre exact', () {
+      // Siège 0 : 3 pions arrivés, le dernier dans sa maison (53 = 3e case).
+      // Siège 1 à l'étape 35 : 2 pas jusqu'à la case devant la maison (37),
+      // puis 3 pas dans la maison : il faut un 5.
+      expect(Rules.exposedPawn(stateWith({0: [53, 56, 56, 56]}), 0), 0);
+      expect(Rules.entryStep(1, 0), 37);
+      final s = stateWith({0: [53, 56, 56, 56], 1: [35, -1, -1, -1]},
+          seats: [0, 1], current: 1, dice: 5, phase: Phase.moving);
+      final m = Rules.move(s, 0);
+      expect(m.raid != null, isTrue);
+      expect(m.raid!.seat, 0);
+      expect(m.raid!.lane, 3);
+      expect(m.captures.length, 1);
+      expect(m.captures.first.from, 53);
+      expect(m.state.steps[0][0], Board.inBase);
+      expect(m.to, 37);
+      expect(m.state.steps[1][0], 37);
+      expect(m.extraTurn, isTrue);
+      expect(m.state.current, 1);
+    });
+
+    test('sans le nombre exact, on passe devant la maison', () {
+      final s = stateWith({0: [53, 56, 56, 56], 1: [35, -1, -1, -1]},
+          seats: [0, 1], current: 1, dice: 4, phase: Phase.moving);
+      final m = Rules.move(s, 0);
+      expect(m.raid, isNull);
+      expect(m.to, 39);
+      expect(m.state.steps[0][0], 53);
+    });
+
+    test('depuis la case devant la maison', () {
+      final s = stateWith({0: [55, 56, 56, 56], 1: [37, -1, -1, -1]},
+          seats: [0, 1], current: 1, dice: 5, phase: Phase.moving);
+      final m = Rules.move(s, 0);
+      expect(m.raid != null, isTrue);
+      expect(m.raid!.lane, 5);
+      expect(m.to, 37);
+    });
+
+    test('un pion déjà passé devant la maison ne peut plus y entrer', () {
+      final s = stateWith({0: [51, 56, 56, 56], 1: [38, -1, -1, -1]},
+          seats: [0, 1], current: 1, dice: 1, phase: Phase.moving);
+      final m = Rules.move(s, 0);
+      expect(m.raid, isNull);
+      expect(m.to, 39);
+    });
+
+    test('la case devant la maison n\'est pas un abri', () {
+      // Siège 2 attend sur la case devant la maison du siège 0 (étape 24
+      // du siège 2 = case 50).
+      final s = stateWith({0: [52, 56, 56, 56], 1: [36, -1, -1, -1], 2: [24, -1, -1, -1]},
+          seats: [0, 1, 2], current: 1, dice: 3, phase: Phase.moving);
+      final m = Rules.move(s, 0);
+      expect(m.raid != null, isTrue);
+      expect(m.captures.length, 2);
+      expect(m.state.steps[2][0], Board.inBase);
     });
   });
 
@@ -340,13 +420,14 @@ void main() {
 }
 
 void _checkInvariants(GameState s) {
-  // Sans abri, deux couleurs différentes ne partagent jamais une case.
+  // Hors abris, deux couleurs différentes ne partagent jamais une case.
   final owners = <int, int>{};
   for (final seat in s.seats) {
     for (final step in s.steps[seat]) {
       expect(step >= -1 && step <= Board.homeStep, isTrue);
       if (step < 0 || step > Board.lastTrackStep) continue;
       final index = Board.absoluteIndex(seat, step);
+      if (Board.isSafeIndex(index)) continue;
       final owner = owners[index];
       expect(owner == null || owner == seat, isTrue,
           reason: 'case $index partagée par $owner et $seat');

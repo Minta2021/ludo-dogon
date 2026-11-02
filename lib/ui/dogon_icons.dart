@@ -4,6 +4,8 @@
 /// Toutes les icônes sont dessinées dans un carré de 24 x 24 unités.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 enum DogonIcon {
@@ -25,6 +27,7 @@ enum DogonIcon {
   chevron,
   sound,
   soundOff,
+  star,
 }
 
 /// Icône du masque d'un siège (0 = Kanaga, 1 = Sirige, 2 = Walu, 3 = Satimbe).
@@ -200,6 +203,14 @@ void paintDogonIcon(Canvas canvas, Rect rect, DogonIcon icon, Color color,
       line([[4, 9.5], [8, 9.5], [13, 5], [13, 19], [8, 14.5], [4, 14.5]], close: true);
       line([[16.5, 9.5], [21.5, 14.5]]);
       line([[21.5, 9.5], [16.5, 14.5]]);
+    case DogonIcon.star:
+      line([
+        for (var i = 0; i < 10; i++)
+          [
+            12 + (i.isEven ? 9.5 : 4.2) * math.cos(-math.pi / 2 + i * math.pi / 5),
+            12.5 + (i.isEven ? 9.5 : 4.2) * math.sin(-math.pi / 2 + i * math.pi / 5),
+          ]
+      ], close: true);
     case DogonIcon.book:
       line([[4, 5], [10, 5], [12, 7], [14, 5], [20, 5], [20, 18], [14, 18], [12, 20], [10, 18], [4, 18]], close: true);
       line([[12, 7], [12, 20]]);

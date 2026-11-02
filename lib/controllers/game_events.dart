@@ -2,6 +2,7 @@
 /// ou l'hôte en Bluetooth), puis rejoués à l'écran sur chaque téléphone.
 library;
 
+import '../game/board.dart';
 import '../game/rules.dart';
 
 sealed class GameEvent {
@@ -43,6 +44,13 @@ sealed class GameEvent {
           reachedHome: json['home'] == true,
           extraTurn: json['extra'] == true,
           seatFinished: json['finished'] == true,
+          raid: json['raid'] is List
+              ? Raid(
+                  seat: ((json['raid'] as List)[0] as num).toInt(),
+                  pawn: ((json['raid'] as List)[1] as num).toInt(),
+                  lane: ((json['raid'] as List)[2] as num).toInt(),
+                )
+              : null,
           state: state,
         );
       case 'end':
@@ -85,6 +93,7 @@ class MoveEvent extends GameEvent {
     required this.extraTurn,
     required this.seatFinished,
     required super.state,
+    this.raid,
   });
 
   factory MoveEvent.fromResult(MoveResult r) => MoveEvent(
@@ -96,6 +105,7 @@ class MoveEvent extends GameEvent {
         reachedHome: r.reachedHome,
         extraTurn: r.extraTurn,
         seatFinished: r.seatFinished,
+        raid: r.raid,
         state: r.state,
       );
 
@@ -107,9 +117,20 @@ class MoveEvent extends GameEvent {
   final bool extraTurn;
   final bool seatFinished;
 
-  /// Étapes à afficher une à une.
-  List<int> get path =>
-      from < 0 ? const [0] : [for (var s = from + 1; s <= to; s++) s];
+  /// Entrée dans la maison d'un adversaire, s'il y en a une.
+  final Raid? raid;
+
+  /// Cases traversées une à une, jusqu'à la case d'arrivée (ou, pour une
+  /// entrée dans une maison adverse, jusqu'au pion avalé dans cette maison).
+  List<Spot> get spots {
+    if (from < 0) return [Spot(seat, 0)];
+    final r = raid;
+    return [
+      for (var s = from + 1; s <= to; s++) Spot(seat, s),
+      if (r != null)
+        for (var l = 1; l <= r.lane; l++) Spot(r.seat, Board.lastTrackStep + l),
+    ];
+  }
 
   @override
   Map<String, Object?> toJson() => {
@@ -124,6 +145,7 @@ class MoveEvent extends GameEvent {
         'home': reachedHome,
         'extra': extraTurn,
         'finished': seatFinished,
+        if (raid != null) 'raid': [raid!.seat, raid!.pawn, raid!.lane],
         'state': state.toJson(),
       };
 }

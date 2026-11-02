@@ -7,10 +7,13 @@
 /// * un 6 donne un nouveau lancer, jusqu'à [Rules.maxSixesInARow] fois de
 ///   suite ; le 6 suivant fait perdre le tour ;
 /// * tomber sur un pion adverse l'avale : il retourne à sa base et le joueur
-///   rejoue. On peut avaler n'importe où sur le parcours, cases de départ
-///   comprises (il n'y a aucun abri) ;
-/// * après un tour complet, le pion entre dans son couloir d'arrivée, où
-///   personne d'autre ne peut aller ;
+///   rejoue ;
+/// * huit abris où l'on ne peut pas être avalé : les 4 tapis (cases de
+///   départ) et les 4 étoiles ;
+/// * après un tour complet, le pion entre dans son couloir d'arrivée (sa
+///   « maison »), où personne d'autre ne va… sauf quand c'est le dernier
+///   pion du joueur : un adversaire qui fait le nombre exact peut alors y
+///   entrer, l'avaler, puis ressortir devant la maison (voir [Raid]) ;
 /// * il faut le nombre exact pour atteindre la toguna, ce qui donne un
 ///   nouveau lancer ;
 /// * le premier joueur qui ramène ses 4 pions gagne ; la partie continue
@@ -187,6 +190,18 @@ class Capture {
   final int from;
 }
 
+/// Entrée dans la maison d'un adversaire pour avaler son dernier pion.
+class Raid {
+  const Raid({required this.seat, required this.pawn, required this.lane});
+
+  /// Joueur attaqué et son pion.
+  final int seat;
+  final int pawn;
+
+  /// Position du pion dans sa maison (1 à 5).
+  final int lane;
+}
+
 /// Résultat d'un lancer de dé.
 class RollResult {
   const RollResult({
@@ -216,24 +231,26 @@ class MoveResult {
     required this.reachedHome,
     required this.extraTurn,
     required this.seatFinished,
+    this.raid,
   });
 
   final GameState state;
   final int seat;
   final int pawn;
   final int from;
+
+  /// Étape d'arrivée (pour une entrée dans la maison adverse : la case
+  /// devant cette maison, où le pion ressort).
   final int to;
   final List<Capture> captures;
   final bool reachedHome;
   final bool extraTurn;
   final bool seatFinished;
 
-  bool get gameOver => state.isOver;
+  /// Entrée dans la maison d'un adversaire, s'il y en a une.
+  final Raid? raid;
 
-  /// Étapes traversées une à une, pour l'animation du pion.
-  List<int> get path => from == Board.inBase
-      ? const [0]
-      : [for (var s = from + 1; s <= to; s++) s];
+  bool get gameOver => state.isOver;
 }
 
 /// Les règles du jeu. Toutes les fonctions sont pures : elles ne modifient
@@ -324,23 +341,37 @@ abstract final class Rules {
     }
 
     final from = state.steps[seat][pawn];
-    final to = from == Board.inBase ? 0 : from + dice;
+    final raid = raidFor(state, seat, pawn, dice);
+    final int to;
+    if (from == Board.inBase) {
+      to = 0;
+    } else if (raid != null) {
+      to = entryStep(seat, raid.seat);
+    } else {
+      to = from + dice;
+    }
     final steps = [for (final row in state.steps) [...row]];
     steps[seat][pawn] = to;
 
-    // Pions adverses avalés : partout sur le parcours commun, sans abri.
     final captures = <Capture>[];
+    if (raid != null) {
+      captures.add(Capture(seat: raid.seat, pawn: raid.pawn, from: steps[raid.seat][raid.pawn]));
+      steps[raid.seat][raid.pawn] = Board.inBase;
+    }
+    // Pions adverses avalés sur la case d'arrivée, sauf sur un abri.
     if (to <= Board.lastTrackStep) {
       final target = Board.absoluteIndex(seat, to);
-      for (final other in state.seats) {
-        if (other == seat) continue;
-        for (var q = 0; q < Board.pawnsPerPlayer; q++) {
-          final s = steps[other][q];
-          if (s >= 0 &&
-              s <= Board.lastTrackStep &&
-              Board.absoluteIndex(other, s) == target) {
-            captures.add(Capture(seat: other, pawn: q, from: s));
-            steps[other][q] = Board.inBase;
+      if (!Board.isSafeIndex(target)) {
+        for (final other in state.seats) {
+          if (other == seat) continue;
+          for (var q = 0; q < Board.pawnsPerPlayer; q++) {
+            final s = steps[other][q];
+            if (s >= 0 &&
+                s <= Board.lastTrackStep &&
+                Board.absoluteIndex(other, s) == target) {
+              captures.add(Capture(seat: other, pawn: q, from: s));
+              steps[other][q] = Board.inBase;
+            }
           }
         }
       }
@@ -376,6 +407,7 @@ abstract final class Rules {
         reachedHome: reachedHome,
         extraTurn: false,
         seatFinished: seatFinished,
+        raid: raid,
       );
     }
 
@@ -402,7 +434,51 @@ abstract final class Rules {
       reachedHome: reachedHome,
       extraTurn: extraTurn,
       seatFinished: seatFinished,
+      raid: raid,
     );
+  }
+
+  /// Pion de [seat] que l'on peut avaler dans sa maison : c'est son dernier
+  /// pion en jeu (les autres sont arrivés à la toguna) et il attend dans son
+  /// couloir d'arrivée. Sinon null.
+  static int? exposedPawn(GameState state, int seat) {
+    int? last;
+    for (var p = 0; p < Board.pawnsPerPlayer; p++) {
+      final s = state.steps[seat][p];
+      if (s == Board.homeStep) continue;
+      if (last != null) return null;
+      last = p;
+    }
+    if (last == null) return null;
+    return Board.isLaneStep(state.steps[seat][last]) ? last : null;
+  }
+
+  /// Étape (comptée depuis le départ de [seat]) de la case qui se trouve
+  /// devant la maison de [owner].
+  static int entryStep(int seat, int owner) =>
+      (Board.absoluteIndex(owner, Board.lastTrackStep) - Board.startIndex(seat)) %
+      Board.trackLength;
+
+  /// Entrée dans une maison adverse possible pour ce pion avec ce dé :
+  /// le pion passe devant la maison, y entre et tombe pile sur le dernier
+  /// pion adverse.
+  static Raid? raidFor(GameState state, int seat, int pawn, int dice) {
+    final s = state.steps[seat][pawn];
+    if (s < 0 || s > Board.lastTrackStep) return null;
+    Raid? best;
+    for (final owner in state.seats) {
+      if (owner == seat || state.ranking.contains(owner)) continue;
+      final q = exposedPawn(state, owner);
+      if (q == null) continue;
+      final lane = state.steps[owner][q] - Board.lastTrackStep;
+      final entry = entryStep(seat, owner);
+      if (entry < s || entry > Board.lastTrackStep) continue;
+      if (entry - s + lane != dice) continue;
+      if (best == null || lane > best.lane) {
+        best = Raid(seat: owner, pawn: q, lane: lane);
+      }
+    }
+    return best;
   }
 
   /// Le siège suivant [seat] qui joue encore.

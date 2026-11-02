@@ -34,15 +34,29 @@ class RulesScreen extends StatelessWidget {
       DogonIcon.walu,
       'Avaler',
       'Si ton lutin tombe pile sur un lutin adverse, il lui fait une prise de '
-          'karaté et l\'avale : le lutin adverse retourne dans sa base et tu rejoues. On peut avaler partout sur le '
-          'parcours, même sur les cases de départ : il n\'y a aucun abri !',
+          'karaté et l\'avale : le lutin adverse retourne dans sa base et tu rejoues.',
+    ),
+    (
+      DogonIcon.star,
+      'Les abris',
+      'Huit cases protègent ton lutin : les 4 tapis (les cases de départ '
+          'colorées, à bordure tissée) et les 4 étoiles. Là, personne ne peut '
+          'l\'avaler, et plusieurs lutins peuvent s\'y côtoyer.',
     ),
     (
       DogonIcon.toguna,
-      'La toguna',
-      'Après un tour complet, ton pion entre dans le couloir à ta couleur, où '
-          'personne ne peut l\'avaler. Il faut le nombre exact pour atteindre la '
-          'toguna. Y rentrer un pion donne un nouveau lancer.',
+      'La maison et la toguna',
+      'Après un tour complet, ton lutin entre dans le couloir à ta couleur : sa '
+          'maison. Il faut le nombre exact pour atteindre la toguna, au centre. '
+          'Y rentrer un lutin donne un nouveau lancer.',
+    ),
+    (
+      DogonIcon.sirige,
+      'Attention au dernier lutin',
+      'Quand il ne te reste qu\'un seul lutin en jeu et qu\'il attend dans ta '
+          'maison, il n\'y est plus à l\'abri : un adversaire qui fait le nombre '
+          'exact peut y entrer, l\'avaler, puis ressortir devant ta maison. Ton '
+          'lutin tremble pour te prévenir !',
     ),
     (
       DogonIcon.bluetooth,
