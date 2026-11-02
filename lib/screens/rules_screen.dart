@@ -14,8 +14,8 @@ class RulesScreen extends StatelessWidget {
     (
       DogonIcon.kanaga,
       'Le but',
-      'Chaque joueur a 4 pions. Le premier qui fait faire le tour du plateau '
-          'à ses 4 pions et les ramène à la toguna, au centre, gagne.',
+      'Chaque joueur a 4 lutins portant son masque. Le premier qui fait faire le '
+          'tour du plateau à ses 4 lutins et les ramène à la toguna, au centre, gagne.',
     ),
     (
       DogonIcon.chevron,
@@ -33,8 +33,8 @@ class RulesScreen extends StatelessWidget {
     (
       DogonIcon.walu,
       'Avaler',
-      'Si ton pion tombe pile sur un pion adverse, il l\'avale : le pion adverse '
-          'retourne dans sa base et tu rejoues. On peut avaler partout sur le '
+      'Si ton lutin tombe pile sur un lutin adverse, il lui fait une prise de '
+          'karaté et l\'avale : le lutin adverse retourne dans sa base et tu rejoues. On peut avaler partout sur le '
           'parcours, même sur les cases de départ : il n\'y a aucun abri !',
     ),
     (

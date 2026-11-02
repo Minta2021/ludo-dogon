@@ -8,6 +8,7 @@ import '../ui/board_painter.dart';
 import '../ui/dogon_icons.dart';
 import '../ui/theme.dart';
 import '../ui/widgets/common.dart';
+import '../ui/widgets/pawn_view.dart';
 import 'bluetooth_screen.dart';
 import 'local_setup_screen.dart';
 import 'rules_screen.dart';
@@ -193,13 +194,13 @@ class _Emblem extends StatelessWidget {
                 child: Center(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 250),
-                    child: DogonIconView(
-                      maskIcon(seat),
+                    child: Padding(
                       key: ValueKey(seat),
-                      size: 64,
-                      color: DogonColors.night,
-                      strokeWidth: 1.6,
-                      semanticLabel: 'Masque ${seatStyles[seat].mask}',
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Semantics(
+                        label: 'Ton lutin au masque ${seatStyles[seat].mask}',
+                        child: LutinView(seat: seat, width: 60),
+                      ),
                     ),
                   ),
                 ),

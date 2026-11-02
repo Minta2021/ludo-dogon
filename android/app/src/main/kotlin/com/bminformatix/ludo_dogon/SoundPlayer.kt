@@ -25,6 +25,7 @@ class SoundPlayer(context: Context) {
     private val sounds: Map<String, Int> = mapOf(
         "dice" to pool.load(context, R.raw.de, 1),
         "capture" to pool.load(context, R.raw.cri_avale, 1),
+        "hit" to pool.load(context, R.raw.coup, 1),
     )
 
     /** Son activé ou coupé (réglage gardé même après fermeture du jeu). */

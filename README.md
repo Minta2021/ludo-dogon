@@ -111,9 +111,12 @@ Nearby (par exemple `8034`). Le bouton **Copier** permet de l'envoyer.
   (constante `sixChance` dans `lib/game/dice.dart`).
 - Un **6** donne un nouveau lancer, **jusqu'à cinq 6 de suite** ; au sixième 6
   d'affilée, le tour est perdu (constante `maxSixesInARow` dans `lib/game/rules.dart`).
-- Tomber sur un pion adverse l'**avale** : il retourne à sa base et le joueur
-  rejoue. On peut avaler **partout sur le parcours**, cases de départ comprises.
-  Un cri retentit et le masque du joueur apparaît sur le plateau.
+- Les pions sont de **petits lutins** portant le masque de leur joueur
+  (Kanaga, Sirige, Walu, Satimbe).
+- Tomber sur un lutin adverse l'**avale** : le vainqueur lui fait une **prise
+  de karaté** (coup de pied sauté, « PAF ! »), le lutin avalé s'envole vers sa
+  base en tournoyant, puis le masque du vainqueur apparaît. Le joueur rejoue.
+  On peut avaler **partout sur le parcours**, cases de départ comprises.
 - Après un tour complet, le pion entre dans son couloir (où personne ne peut
   l'avaler) ; il faut le **nombre exact** pour atteindre la **toguna** (le
   centre), ce qui donne un nouveau lancer.
@@ -143,6 +146,8 @@ lib/
     links.dart                 protocole entre la partie et le réseau
   models/                      configuration de partie, profil du joueur
   ui/                          couleurs, icônes dogon, plateau, pions, dé
+    sketch/lutin_art.dart      dessin des lutins masqués et de leurs postures
+    sketch/fight_choreo.dart   chorégraphie de la prise de karaté
   screens/                     accueil, préparation, Bluetooth, jeu, règles
 android/app/src/main/          manifeste (autorisations), icône, MainActivity, sons
 packages/nearby_connections/   copie locale corrigée du plugin Bluetooth
@@ -176,9 +181,11 @@ affichage et connexion Bluetooth réelle).
 
 - **Couleurs et polices** : `lib/ui/theme.dart`.
 - **Prénoms de l'ordinateur** : `botNames` dans `lib/models/match.dart`.
-- **Vitesse des animations** : `GameTiming` dans `lib/controllers/game_controller.dart`.
-- **Sons** : `android/app/src/main/res/raw/de.wav` (le dé) et
-  `cri_avale.wav` (le cri quand un pion est avalé). Ils ont été fabriqués par
+- **Vitesse des animations** : `GameTiming` dans `lib/controllers/game_controller.dart`
+  (`fight` = durée de la prise de karaté).
+- **Lutins et postures** : `lib/ui/sketch/lutin_art.dart`.
+- **Sons** : `android/app/src/main/res/raw/de.wav` (le dé),
+  `cri_avale.wav` (le cri de karaté) et `coup.wav` (le coup qui touche). Ils ont été fabriqués par
   ordinateur : pour mettre ta propre voix ou un vrai dé, enregistre un son
   court (moins de 2 secondes), convertis-le en `.wav` ou `.ogg` et remplace le
   fichier en gardant **exactement le même nom** (un seul fichier par nom).

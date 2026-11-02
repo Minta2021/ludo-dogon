@@ -1,116 +1,136 @@
-/// Un pion vu du dessus : disque coloré, contour sombre et signe en kaolin
-/// propre à chaque masque (pour distinguer les joueurs sans les couleurs).
+/// Un pion : petit lutin portant le masque dogon de son joueur.
 library;
-
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../theme.dart';
+import '../sketch/canvas_pen.dart';
+import '../sketch/lutin_art.dart';
 
-class PawnView extends StatelessWidget {
-  const PawnView({
+/// Rapport hauteur / largeur de la boîte d'un lutin.
+const double lutinBoxRatio = 1.6;
+
+/// Distance entre les pieds et le bas de la boîte, en fraction de la largeur.
+const double lutinFeetMargin = 0.1;
+
+/// Dessine un lutin dans une boîte de [width] x [width] × 1,6, les pieds
+/// en bas au centre.
+class LutinView extends StatelessWidget {
+  const LutinView({
     super.key,
     required this.seat,
-    required this.size,
-    this.highlight = 0,
+    required this.width,
+    this.pose = LutinPose.idle,
+    this.facingLeft = false,
+    this.glow = 0,
+    this.lift = 0,
+    this.shadow = true,
   });
 
   final int seat;
-  final double size;
+  final double width;
+  final LutinPose pose;
+  final bool facingLeft;
 
-  /// Intensité de la mise en valeur (0 = aucune, 1 = maximale) pour les
-  /// pions jouables.
-  final double highlight;
+  /// Anneau lumineux au sol (0 = aucun) : le pion peut être joué.
+  final double glow;
+
+  /// Hauteur du saut, en fraction de la largeur.
+  final double lift;
+  final bool shadow;
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      size: Size.square(size),
-      painter: _PawnPainter(seat, highlight),
+      size: Size(width, width * lutinBoxRatio),
+      painter: LutinPainter(
+        seat: seat,
+        pose: pose,
+        facingLeft: facingLeft,
+        glow: glow,
+        lift: lift,
+        shadow: shadow,
+      ),
     );
   }
 }
 
-class _PawnPainter extends CustomPainter {
-  _PawnPainter(this.seat, this.highlight);
+class LutinPainter extends CustomPainter {
+  LutinPainter({
+    required this.seat,
+    required this.pose,
+    required this.facingLeft,
+    required this.glow,
+    required this.lift,
+    required this.shadow,
+  });
 
   final int seat;
-  final double highlight;
+  final LutinPose pose;
+  final bool facingLeft;
+  final double glow;
+  final double lift;
+  final bool shadow;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final style = seatStyles[seat];
-    final c = size.center(Offset.zero);
-    final r = size.width * 0.36;
-
-    if (highlight > 0) {
-      final ring = r * (1.18 + 0.16 * highlight);
-      canvas.drawCircle(
-          c,
-          ring,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = r * 0.22
-            ..color = DogonColors.kaolin.withValues(alpha: 0.55 + 0.45 * highlight));
-      canvas.drawCircle(
-          c,
-          ring + r * 0.16,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = r * 0.1
-            ..color = DogonColors.nightDeep.withValues(alpha: 0.8));
-    }
-
-    // Ombre portée.
-    canvas.drawOval(
-      Rect.fromCenter(center: c + Offset(0, r * 0.28), width: r * 2.1, height: r * 1.8),
-      Paint()..color = DogonColors.nightDeep.withValues(alpha: 0.38),
-    );
-    // Corps du pion.
-    canvas.drawCircle(c, r, Paint()..color = style.color);
-    // Reflet en haut à gauche pour un effet de bois poli.
-    canvas.drawCircle(
-      c - Offset(r * 0.32, r * 0.32),
-      r * 0.42,
-      Paint()..color = Colors.white.withValues(alpha: 0.16),
-    );
-    canvas.drawCircle(
-      c,
-      r,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = math.max(1.2, r * 0.18)
-        ..color = DogonColors.nightDeep,
-    );
-
-    // Signe du masque.
-    final mark = Paint()
-      ..color = DogonColors.kaolin
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(1.2, r * 0.2)
-      ..strokeCap = StrokeCap.round;
-    final k = r * 0.42;
-    switch (seat) {
-      case 0: // Kanaga : un point
-        canvas.drawCircle(c, r * 0.24, Paint()..color = DogonColors.kaolin);
-      case 1: // Sirige : une barre verticale
-        canvas.drawLine(c - Offset(0, k), c + Offset(0, k), mark);
-      case 2: // Walu : deux cornes
-        canvas.drawPath(
-          Path()
-            ..moveTo(c.dx - k, c.dy - k * 0.8)
-            ..lineTo(c.dx, c.dy + k * 0.8)
-            ..lineTo(c.dx + k, c.dy - k * 0.8),
-          mark..strokeJoin = StrokeJoin.round,
-        );
-      default: // Satimbe : une croix
-        canvas.drawLine(c - Offset(k, 0), c + Offset(k, 0), mark);
-        canvas.drawLine(c - Offset(0, k), c + Offset(0, k), mark);
-    }
+    final pen = CanvasPen(canvas);
+    final unit = size.width / 100;
+    canvas.save();
+    canvas.translate(size.width / 2, size.height - size.width * lutinFeetMargin);
+    canvas.scale(unit, unit);
+    if (glow > 0) drawLutinGlow(pen, glow);
+    if (shadow) drawLutinShadow(pen, opacity: 0.35 - (lift * 0.6).clamp(0.0, 0.2));
+    canvas.translate(0, -lift * 100);
+    drawLutin(pen, seat: seat, pose: pose, facingLeft: facingLeft);
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_PawnPainter old) =>
-      old.seat != seat || old.highlight != highlight;
+  bool shouldRepaint(LutinPainter old) =>
+      old.seat != seat ||
+      !identical(old.pose, pose) ||
+      old.facingLeft != facingLeft ||
+      old.glow != glow ||
+      old.lift != lift ||
+      old.shadow != shadow;
+}
+
+/// Le lutin vainqueur qui sautille en levant les bras.
+class CheeringLutin extends StatefulWidget {
+  const CheeringLutin({super.key, required this.seat, required this.width});
+
+  final int seat;
+  final double width;
+
+  @override
+  State<CheeringLutin> createState() => _CheeringLutinState();
+}
+
+class _CheeringLutinState extends State<CheeringLutin> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 520),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final t = Curves.easeOut.transform(_c.value);
+        return LutinView(
+          seat: widget.seat,
+          width: widget.width,
+          pose: LutinPose.lerp(const LutinPose(squash: 0.88), LutinPose.cheer, t),
+          lift: 0.12 * t,
+        );
+      },
+    );
+  }
 }

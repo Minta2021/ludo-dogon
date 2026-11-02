@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../game/ai.dart';
+import '../game/board.dart';
 import '../game/dice.dart';
 import '../game/rules.dart';
 import '../models/match.dart';
@@ -26,8 +27,12 @@ abstract final class GameTiming {
   static const hop = Duration(milliseconds: 150);
   static const exitBase = Duration(milliseconds: 300);
   static const afterMove = Duration(milliseconds: 220);
-  static const afterCapture = Duration(milliseconds: 1450);
-  static const captureFlash = Duration(milliseconds: 1350);
+  static const afterCapture = Duration(milliseconds: 1100);
+  static const captureFlash = Duration(milliseconds: 1000);
+
+  /// Prise de karaté : durée totale et instant du coup (voir FightTiming).
+  static const fight = Duration(milliseconds: 1400);
+  static const fightImpact = Duration(milliseconds: 476);
   static const noMovePause = Duration(milliseconds: 1000);
   static const botRoll = Duration(milliseconds: 700);
   static const botMove = Duration(milliseconds: 500);
@@ -109,6 +114,10 @@ class GameController extends ChangeNotifier {
   /// Dernier événement marquant (capture, six, arrivée...).
   String eventText = '';
   MessageTone eventTone = MessageTone.neutral;
+
+  /// Prise de karaté en cours (null sinon).
+  FightInfo? fight;
+  int _fightIds = 0;
 
   /// Augmente à chaque pion avalé : déclenche l'apparition du masque.
   int captureFlash = 0;
@@ -208,6 +217,7 @@ class GameController extends ChangeNotifier {
     _queue.clear();
     _stepOverride.clear();
     hoppingKey = null;
+    fight = null;
     diceRolling = false;
     _diceFace = null;
     _awaitingHost = false;
@@ -485,8 +495,12 @@ class GameController extends ChangeNotifier {
         _notify();
       case MoveEvent():
         final key = event.seat * 4 + event.pawn;
+        final capture = event.captures.isNotEmpty;
+        final path = event.path;
+        // En cas de prise, la dernière case se gagne d'un coup de pied sauté.
+        final walk = capture ? path.sublist(0, path.length - 1) : path;
         hoppingKey = key;
-        for (final step in event.path) {
+        for (final step in walk) {
           _stepOverride[key] = step;
           _notify();
           final pause = event.from < 0 ? GameTiming.exitBase : GameTiming.hop;
@@ -495,6 +509,35 @@ class GameController extends ChangeNotifier {
             hoppingKey = null;
             return;
           }
+        }
+        hoppingKey = null;
+        if (capture) {
+          fight = FightInfo(
+            id: ++_fightIds,
+            seat: event.seat,
+            pawn: event.pawn,
+            fromStep: walk.isEmpty ? event.from : walk.last,
+            toStep: event.to,
+            victims: event.captures,
+          );
+          // Sous la scène, les pions rejoignent déjà leur place finale (cachés).
+          _stepOverride[key] = event.to;
+          for (final v in event.captures) {
+            _stepOverride[v.seat * 4 + v.pawn] = Board.inBase;
+          }
+          _playSound(GameSound.capture);
+          _notify();
+          final impactOk = await _hold(GameTiming.fightImpact, epoch);
+          if (impactOk) {
+            _playSound(GameSound.hit);
+            HapticFeedback.heavyImpact();
+          }
+          if (!impactOk || !await _hold(GameTiming.fight - GameTiming.fightImpact, epoch)) {
+            fight = null;
+            _stepOverride.clear();
+            return;
+          }
+          fight = null;
         }
         _stepOverride.clear();
         hoppingKey = null;
@@ -520,8 +563,6 @@ class GameController extends ChangeNotifier {
           : '$name avale un pion de $victims !';
       captureSeat = event.seat;
       captureFlash++;
-      _playSound(GameSound.capture);
-      HapticFeedback.heavyImpact();
     } else if (event.seatFinished) {
       final place = event.state.ranking.indexOf(event.seat) + 1;
       eventText = place == 1
@@ -557,4 +598,29 @@ class GameController extends ChangeNotifier {
     }
     super.dispose();
   }
+}
+
+/// Une prise de karaté : qui frappe, d'où, et qui est avalé.
+class FightInfo {
+  const FightInfo({
+    required this.id,
+    required this.seat,
+    required this.pawn,
+    required this.fromStep,
+    required this.toStep,
+    required this.victims,
+  });
+
+  final int id;
+  final int seat;
+  final int pawn;
+
+  /// Étape d'où part le saut (-1 : depuis la base).
+  final int fromStep;
+  final int toStep;
+  final List<Capture> victims;
+
+  bool involves(int seat, int pawn) =>
+      (seat == this.seat && pawn == this.pawn) ||
+      victims.any((v) => v.seat == seat && v.pawn == pawn);
 }

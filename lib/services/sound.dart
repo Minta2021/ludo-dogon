@@ -8,8 +8,11 @@ enum GameSound {
   /// Le dé qui roule.
   dice('dice'),
 
-  /// Le cri quand un pion est avalé.
-  capture('capture');
+  /// Le cri (kiai) quand un pion se jette sur un autre.
+  capture('capture'),
+
+  /// Le coup de pied qui touche.
+  hit('hit');
 
   const GameSound(this.id);
   final String id;

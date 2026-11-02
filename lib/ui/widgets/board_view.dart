@@ -1,4 +1,5 @@
-/// Le plateau animé : dessin du plateau + pions qui se déplacent.
+/// Le plateau animé : dessin du plateau, lutins qui se déplacent et prise
+/// de karaté quand un pion en avale un autre.
 library;
 
 import 'dart:math' as math;
@@ -10,7 +11,10 @@ import '../../game/board.dart';
 import '../board_geometry.dart';
 import '../board_painter.dart';
 import '../theme.dart';
+import '../sketch/fight_choreo.dart';
+import '../sketch/lutin_art.dart';
 import 'capture_flash.dart';
+import 'fight_layer.dart';
 import 'pawn_view.dart';
 
 class BoardView extends StatefulWidget {
@@ -28,8 +32,11 @@ class BoardView extends StatefulWidget {
 class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMixin {
   late final AnimationController _pulse = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 700),
+    duration: const Duration(milliseconds: 420),
   )..repeat(reverse: true);
+
+  /// Dernier sens de marche de chaque lutin (siège * 4 + pion).
+  final Map<int, bool> _facingLeft = {};
 
   @override
   void dispose() {
@@ -65,11 +72,22 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
     );
   }
 
+  /// Position des pieds d'un lutin, en cases affichées.
+  Offset _feet(int seat, int pawn, int step, {Offset stack = Offset.zero}) {
+    final logical = BoardGeometry.pawnPoint(seat, pawn, step);
+    final d = BoardGeometry.rotatePoint(logical, widget.rotation) + stack;
+    // Les pieds un peu sous le centre : le corps occupe la case. Dans la
+    // base, un peu plus bas pour que le lutin reste dans la cour.
+    final drop = step < 0 ? 0.55 : (step >= Board.homeStep ? 0.15 : 0.3);
+    return d + Offset(0, drop);
+  }
+
   Widget _buildBoard(double cell, double size) {
     final c = widget.controller;
     final state = c.state;
     final k = widget.rotation;
     final movable = c.movablePawns.toSet();
+    final fight = c.fight;
 
     // Positions logiques de tous les pions, regroupés par case.
     final entries = <_PawnEntry>[];
@@ -83,10 +101,11 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
           step: step,
           movable: seat == state.current && movable.contains(pawn),
           hopping: c.hoppingKey == seat * 4 + pawn,
+          hidden: fight?.involves(seat, pawn) ?? false,
         );
         entries.add(e);
         final cellPos = Board.cellFor(seat, step);
-        if (cellPos != null) (byCell[cellPos] ??= []).add(e);
+        if (cellPos != null && !e.hidden) (byCell[cellPos] ??= []).add(e);
       }
     }
 
@@ -97,9 +116,21 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
         group[i].stacked = group.length > 1;
       }
     }
+    for (final e in entries) {
+      e.feet = _feet(e.seat, e.pawn, e.step, stack: e.stackOffset);
+      if (e.hopping) {
+        final prev = _feet(e.seat, e.pawn, e.step - 1);
+        final dx = e.feet.dx - prev.dx;
+        if (dx.abs() > 0.05) _facingLeft[e.seat * 4 + e.pawn] = dx < 0;
+      }
+    }
 
-    // Les pions jouables et celui qui saute passent au premier plan.
-    entries.sort((a, b) => a.layer.compareTo(b.layer));
+    // Du fond vers l'avant : les lutins plus bas passent devant ; les pions
+    // jouables et celui qui saute restent au premier plan.
+    entries.sort((a, b) {
+      final l = a.layer.compareTo(b.layer);
+      return l != 0 ? l : a.feet.dy.compareTo(b.feet.dy);
+    });
 
     return Stack(
       clipBehavior: Clip.none,
@@ -112,6 +143,16 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
           ),
         ),
         for (final e in entries) _positionedPawn(e, cell),
+        if (fight != null)
+          Positioned.fill(
+            child: FightLayer(
+              key: ValueKey('fight-${fight.id}'),
+              scene: _scene(fight),
+              cell: cell,
+              lutinWidth: cell * _normalWidth,
+              duration: GameTiming.fight,
+            ),
+          ),
         Positioned.fill(
           child: CaptureFlash(
             trigger: c.captureFlash,
@@ -123,43 +164,76 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
     );
   }
 
-  Widget _positionedPawn(_PawnEntry e, double cell) {
-    final logical = BoardGeometry.pawnPoint(e.seat, e.pawn, e.step);
-    final display = BoardGeometry.rotatePoint(logical, widget.rotation) + e.stackOffset;
-    final double pawnSize;
-    if (e.step >= Board.homeStep) {
-      pawnSize = cell * 0.62;
-    } else if (e.stacked) {
-      pawnSize = cell * 0.78;
-    } else {
-      pawnSize = cell * 1.05;
-    }
-    // Zone de toucher plus grande que le pion pour les doigts.
-    final hit = e.movable ? math.max(pawnSize, 44.0) : pawnSize;
-    final style = seatStyles[e.seat];
+  static const double _normalWidth = 1.05;
 
-    Widget pawn = AnimatedBuilder(
-      animation: _pulse,
-      builder: (context, _) => PawnView(
-        seat: e.seat,
-        size: pawnSize,
-        highlight: e.movable ? 0.35 + 0.65 * _pulse.value : 0,
-      ),
+  FightScene _scene(FightInfo f) {
+    Pt pt(Offset o) => Pt(o.dx, o.dy);
+    return FightScene(
+      attackerSeat: f.seat,
+      victimSeats: [for (final v in f.victims) v.seat],
+      start: pt(_feet(f.seat, f.pawn, f.fromStep)),
+      target: pt(_feet(f.seat, f.pawn, f.toStep)),
+      homes: [for (final v in f.victims) pt(_feet(v.seat, v.pawn, Board.inBase))],
     );
+  }
 
+  Widget _positionedPawn(_PawnEntry e, double cell) {
+    final double width;
+    if (e.step >= Board.homeStep) {
+      width = cell * 0.58;
+    } else if (e.stacked) {
+      width = cell * 0.8;
+    } else {
+      width = cell * _normalWidth;
+    }
+    final height = width * lutinBoxRatio;
+    // Zone de toucher plus grande que le lutin pour les doigts.
+    final boxW = e.movable ? math.max(width, 44.0) : width;
+    final boxH = e.movable ? math.max(height, 52.0) : height;
+    final style = seatStyles[e.seat];
+    final facing = _facingLeft[e.seat * 4 + e.pawn] ?? false;
+
+    Widget pawn;
     if (e.movable) {
+      pawn = AnimatedBuilder(
+        animation: _pulse,
+        builder: (context, _) {
+          final t = Curves.easeOut.transform(_pulse.value);
+          return LutinView(
+            seat: e.seat,
+            width: width,
+            pose: LutinPose.lerp(LutinPose.idle, LutinPose.hop, t * 0.35),
+            glow: 0.3 + 0.7 * t,
+            lift: 0.12 * t,
+            facingLeft: facing,
+          );
+        },
+      );
+    } else {
+      pawn = LutinView(
+        seat: e.seat,
+        width: width,
+        pose: e.hopping ? LutinPose.hop : LutinPose.idle,
+        lift: e.hopping ? 0.12 : 0,
+        facingLeft: facing,
+      );
+    }
+    pawn = RepaintBoundary(child: Align(alignment: Alignment.bottomCenter, child: pawn));
+
+    if (e.movable && !e.hidden) {
       pawn = Semantics(
         button: true,
-        label: 'Pion ${style.colorName} ${e.pawn + 1}, jouable',
+        label: 'Lutin ${style.mask} ${e.pawn + 1}, jouable',
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => widget.controller.movePawn(e.pawn),
-          child: Center(child: pawn),
+          child: pawn,
         ),
       );
     } else {
-      pawn = IgnorePointer(child: Center(child: pawn));
+      pawn = IgnorePointer(child: pawn);
     }
+    if (e.hidden) pawn = Opacity(opacity: 0, child: pawn);
 
     return AnimatedPositioned(
       key: ValueKey('pawn-${e.seat}-${e.pawn}'),
@@ -167,10 +241,10 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
           ? const Duration(milliseconds: 130)
           : const Duration(milliseconds: 420),
       curve: e.hopping ? Curves.easeOut : Curves.easeInOutCubic,
-      left: display.dx * cell - hit / 2,
-      top: display.dy * cell - hit / 2,
-      width: hit,
-      height: hit,
+      left: e.feet.dx * cell - boxW / 2,
+      top: e.feet.dy * cell + width * lutinFeetMargin - boxH,
+      width: boxW,
+      height: boxH,
       child: pawn,
     );
   }
@@ -183,6 +257,7 @@ class _PawnEntry {
     required this.step,
     required this.movable,
     required this.hopping,
+    required this.hidden,
   });
 
   final int seat;
@@ -190,8 +265,12 @@ class _PawnEntry {
   final int step;
   final bool movable;
   final bool hopping;
+
+  /// Le lutin joue la prise de karaté (dessiné par FightLayer).
+  final bool hidden;
   Offset stackOffset = Offset.zero;
   bool stacked = false;
+  Offset feet = Offset.zero;
 
   int get layer => hopping ? 2 : (movable ? 1 : 0);
 }

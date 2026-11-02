@@ -13,6 +13,7 @@ import '../ui/theme.dart';
 import '../ui/widgets/board_view.dart';
 import '../ui/widgets/common.dart';
 import '../ui/widgets/dice_view.dart';
+import '../ui/widgets/pawn_view.dart';
 import 'rules_screen.dart';
 
 class GameScreen extends StatefulWidget {
@@ -481,7 +482,25 @@ class _ResultsOverlay extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (winner != null) MaskBadge(seat: winner, size: 72, ring: true),
+                  if (winner != null)
+                    Container(
+                      width: 112,
+                      height: 112,
+                      decoration: BoxDecoration(
+                        color: DogonColors.banco,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: seatStyles[winner].color, width: 4),
+                      ),
+                      child: ClipOval(
+                        child: Align(
+                          alignment: const Alignment(0, 0.55),
+                          child: Semantics(
+                            label: 'Le lutin ${seatStyles[winner].mask} célèbre sa victoire',
+                            child: CheeringLutin(seat: winner, width: 62),
+                          ),
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 18),
                   Text(
                     winner == null ? 'Partie terminée' : '${controller.nameOf(winner)} gagne !',

@@ -1,7 +1,8 @@
 """Synthèse des sons de Ludo Dogon (aucun fichier externe : tout est calculé).
 
 - de.wav        : le dé secoué dans la main puis qui roule sur le plateau
-- cri_avale.wav : coup de djembé + cri « Hé-yaaa ! » quand un pion est avalé
+- cri_avale.wav : coup de djembé + cri « Hé-yaaa ! » quand un lutin attaque
+- coup.wav      : le coup de pied de karaté qui touche
 """
 import os
 import sys
@@ -184,6 +185,35 @@ def shout():
     return mix
 
 
+# ---------------------------------------------------------------------------
+# Le coup de karaté
+
+
+def punch():
+    dur = 0.38
+    t = t_axis(dur)
+    n = len(t)
+    # Souffle du coup de pied (bruit qui monte), juste avant l'impact.
+    pre = int(0.07 * FS)
+    whoosh = bandpass(rng.normal(0, 1, pre), 500, 2500)
+    whoosh *= np.linspace(0, 1, pre) ** 2 * 0.25
+    # Impact : basse qui tombe + claquement + corps.
+    ti = t_axis(dur - 0.07)
+    f = 120 * np.exp(-ti / 0.05) + 48
+    body = np.sin(2 * np.pi * np.cumsum(f) / FS) * np.exp(-ti / 0.085)
+    smack = bandpass(rng.normal(0, 1, len(ti)), 700, 6000) * np.exp(-ti / 0.011)
+    thud = np.sin(2 * np.pi * 230 * ti) * np.exp(-ti / 0.03)
+    hitpart = 1.0 * body + 0.9 * smack + 0.35 * thud
+    out = np.zeros(n)
+    out[:pre] += whoosh
+    out[pre:pre + len(hitpart)] += hitpart
+    out = np.tanh(2.2 * out) / np.tanh(2.2)
+    out = highpass(out, 40)
+    fade = int(0.03 * FS)
+    out[-fade:] *= np.linspace(1, 0, fade)
+    return out
+
+
 def save(name, x, peak=0.95):
     x = x / np.max(np.abs(x)) * peak
     pcm = np.int16(np.clip(x, -1, 1) * 32767)
@@ -196,3 +226,4 @@ if __name__ == '__main__':
     os.makedirs(out, exist_ok=True)
     save(os.path.join(out, 'de.wav'), dice_sound(), peak=0.9)
     save(os.path.join(out, 'cri_avale.wav'), shout(), peak=0.97)
+    save(os.path.join(out, 'coup.wav'), punch(), peak=0.97)
